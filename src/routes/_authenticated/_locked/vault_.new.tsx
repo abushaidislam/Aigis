@@ -148,6 +148,7 @@ function NewAccountPage() {
           </motion.div>
         </AnimatePresence>
       </div>
+      <BottomTabs />
     </AegisScreen>
   );
 }
