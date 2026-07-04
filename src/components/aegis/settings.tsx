@@ -73,6 +73,18 @@ export function LargeTitle({ title, subtitle }: { title: string; subtitle?: stri
           {subtitle}
         </p>
       )}
+      {/* Fade + blur veil so content scrolling behind the sticky title dissolves */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[calc(100%+28px)]"
+        style={{
+          background:
+            "linear-gradient(to bottom, rgba(247,244,237,0.96) 0%, rgba(247,244,237,0.92) 55%, rgba(247,244,237,0.55) 82%, rgba(247,244,237,0) 100%)",
+          backdropFilter: "blur(10px)",
+          maskImage:
+            "linear-gradient(to bottom, #000 0%, #000 70%, rgba(0,0,0,0.6) 88%, transparent 100%)",
+        }}
+      />
     </div>
   );
 }
