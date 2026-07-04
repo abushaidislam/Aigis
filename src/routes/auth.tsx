@@ -48,10 +48,17 @@ function AuthPage() {
   const [notice, setNotice] = useState<{ kind: "error" | "info"; text: string } | null>(null);
 
   useEffect(() => {
+    try {
+      const last = window.localStorage.getItem(LAST_EMAIL_KEY);
+      if (last) setEmail(last);
+    } catch {
+      /* ignore */
+    }
     supabase.auth.getUser().then(({ data }) => {
       if (data.user) navigate({ to: "/", replace: true });
     });
   }, [navigate]);
+
 
   const handleEmail = async (e: React.FormEvent) => {
     e.preventDefault();
