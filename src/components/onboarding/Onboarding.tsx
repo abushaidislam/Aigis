@@ -787,10 +787,11 @@ const TOTAL = 7;
 
 /* Subtle haptics — silent no-op where unsupported (desktop, iOS Safari). */
 type HapticKind = "tick" | "soft" | "success";
-function haptic(kind: HapticKind = "tick") {
+const HAPTICS_STORAGE_KEY = "aegis.haptics";
+
+function vibratePattern(kind: HapticKind) {
   if (typeof navigator === "undefined" || typeof navigator.vibrate !== "function") return;
-  const pattern =
-    kind === "success" ? [8, 40, 14] : kind === "soft" ? 6 : 10;
+  const pattern = kind === "success" ? [8, 40, 14] : kind === "soft" ? 6 : 10;
   try {
     navigator.vibrate(pattern);
   } catch {
@@ -798,9 +799,51 @@ function haptic(kind: HapticKind = "tick") {
   }
 }
 
+function getInitialHapticsPref(reduceMotion: boolean | null): boolean {
+  if (typeof window === "undefined") return true;
+  try {
+    const stored = window.localStorage.getItem(HAPTICS_STORAGE_KEY);
+    if (stored === "on") return true;
+    if (stored === "off") return false;
+  } catch {
+    /* ignore */
+  }
+  // No stored preference: default off if the user prefers reduced motion.
+  return !reduceMotion;
+}
+
 export default function Onboarding() {
   const [[step, dir], setState] = useState<[number, number]>([0, 1]);
   const thresholdArmedRef = useRef<null | "next" | "back">(null);
+  const reduceMotion = useReducedMotion();
+
+  const [hapticsOn, setHapticsOn] = useState<boolean>(() => getInitialHapticsPref(reduceMotion));
+
+  // Persist changes.
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(HAPTICS_STORAGE_KEY, hapticsOn ? "on" : "off");
+    } catch {
+      /* ignore */
+    }
+  }, [hapticsOn]);
+
+  const haptic = useCallback(
+    (kind: HapticKind = "tick") => {
+      if (!hapticsOn) return;
+      vibratePattern(kind);
+    },
+    [hapticsOn],
+  );
+
+  const toggleHaptics = () => {
+    setHapticsOn((v) => {
+      const nextOn = !v;
+      // Confirm the toggle turning on with a tiny pulse.
+      if (nextOn) vibratePattern("soft");
+      return nextOn;
+    });
+  };
 
   const goNext = () => {
     haptic("tick");
@@ -840,7 +883,16 @@ export default function Onboarding() {
         className="relative z-10 mx-auto flex h-full w-full max-w-[440px] flex-col"
         style={{ paddingTop: "max(8px, env(safe-area-inset-top))" }}
       >
-        <TopBar step={step} total={TOTAL} onBack={goBack} onSkip={goSkip} canSkip={canSkip} />
+        <TopBar
+          step={step}
+          total={TOTAL}
+          onBack={goBack}
+          onSkip={goSkip}
+          canSkip={canSkip}
+          hapticsOn={hapticsOn}
+          onToggleHaptics={toggleHaptics}
+        />
+
 
         <div className="relative flex-1 overflow-hidden" style={{ touchAction: "pan-y" }}>
           <AnimatePresence mode="wait" initial={false} custom={dir}>
