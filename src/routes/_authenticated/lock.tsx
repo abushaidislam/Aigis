@@ -11,11 +11,20 @@ import {
   KDF_ALGORITHM,
 } from "@/lib/vault-crypto";
 import { setVaultKey } from "@/lib/vault-session";
-import { Lock, KeyRound, Sparkles } from "lucide-react";
+import {
+  disableBiometric,
+  enrollBiometric,
+  isBiometricEnabled,
+  isBiometricPending,
+  isBiometricSupported,
+  unlockWithBiometric,
+} from "@/lib/biometric";
+import { Lock, KeyRound, Sparkles, Fingerprint } from "lucide-react";
 import {
   AegisScreen,
   BrandBar,
   CHARCOAL,
+  CREAM_SOFT,
   Display,
   Eyebrow,
   Field,
@@ -30,6 +39,7 @@ import {
   soft,
 } from "@/components/aegis/chrome";
 import { Loader2 } from "lucide-react";
+
 
 const searchSchema = z.object({ redirect: z.string().optional() });
 
