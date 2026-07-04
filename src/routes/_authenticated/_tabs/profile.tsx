@@ -4,25 +4,22 @@ import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { lockVault } from "@/lib/vault-session";
-import { User, Mail, Loader2, LogOut } from "lucide-react";
+import { User, Mail, Loader2, LogOut, Check, Pencil } from "lucide-react";
 import {
   BORDER,
-  BrandBar,
   CHARCOAL,
   CREAM_SOFT,
-  Display,
-  Eyebrow,
-  Field,
-  GhostButton,
-  HeroIcon,
-  Lede,
   MUTED,
   Notice,
-  PrimaryButton,
-  inputClass,
-  inputStyle,
   soft,
 } from "@/components/aegis/chrome";
+import {
+  AppBar,
+  LargeTitle,
+  SectionLabel,
+  SettingsGroup,
+  SettingsRow,
+} from "@/components/aegis/settings";
 
 export const Route = createFileRoute("/_authenticated/_tabs/profile")({
   component: ProfilePage,
@@ -46,8 +43,10 @@ function ProfilePage() {
   const { user } = Route.useRouteContext();
 
   const [displayName, setDisplayName] = useState("");
+  const [initialName, setInitialName] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [notice, setNotice] = useState<{ kind: "error" | "info"; text: string } | null>(null);
 
   useEffect(() => {
@@ -60,7 +59,11 @@ function ProfilePage() {
         .maybeSingle();
       if (cancelled) return;
       if (error) setNotice({ kind: "error", text: error.message });
-      else setDisplayName(data?.display_name ?? "");
+      else {
+        const v = data?.display_name ?? "";
+        setDisplayName(v);
+        setInitialName(v);
+      }
       setLoading(false);
     })();
     return () => {
@@ -68,25 +71,29 @@ function ProfilePage() {
     };
   }, [user.id]);
 
-  const save = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const save = async () => {
     setSaving(true);
     setNotice(null);
     try {
       const { error } = await supabase.from("profiles").upsert(
-        {
-          id: user.id,
-          display_name: displayName.trim() || null,
-        },
+        { id: user.id, display_name: displayName.trim() || null },
         { onConflict: "id" },
       );
       if (error) throw error;
+      setInitialName(displayName);
+      setEditing(false);
       setNotice({ kind: "info", text: "Profile saved." });
     } catch (err) {
       setNotice({ kind: "error", text: err instanceof Error ? err.message : "Could not save." });
     } finally {
       setSaving(false);
     }
+  };
+
+  const cancelEdit = () => {
+    setDisplayName(initialName);
+    setEditing(false);
+    setNotice(null);
   };
 
   const signOut = async () => {
@@ -98,42 +105,44 @@ function ProfilePage() {
   };
 
   const seed = displayName || user.email || "?";
+  const displayShown = initialName || "Unnamed";
 
   return (
     <>
-      <BrandBar />
+      <AppBar title="Profile" />
 
-      <motion.div
-        initial={{ opacity: 0, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={soft}
-        className="flex flex-col items-start gap-4 pt-2 pb-6"
-      >
-        <HeroIcon Icon={User} />
-        <div className="flex flex-col gap-2">
-          <Eyebrow>Profile</Eyebrow>
-          <Display>You.</Display>
-          <Lede>How you show up inside Aegis. Nothing here is shared.</Lede>
-        </div>
-      </motion.div>
+      <LargeTitle title="Account" subtitle="How you show up inside Aegis." />
 
-      <div className="flex flex-1 flex-col gap-4 overflow-y-auto pb-[calc(96px+env(safe-area-inset-bottom))]">
+      <div className="flex flex-1 flex-col gap-1 overflow-y-auto pt-1 pb-[calc(96px+env(safe-area-inset-bottom))]">
         <motion.div
-          initial={{ opacity: 0, y: 8 }}
+          initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ ...soft, delay: 0.05 }}
-          className="flex items-center gap-3 rounded-[14px] px-3.5 py-3"
-          style={{ background: CREAM_SOFT, border: `1px solid ${BORDER}` }}
+          transition={soft}
+          className="flex items-center gap-3.5 rounded-[16px] px-4 py-4"
+          style={{
+            background: CREAM_SOFT,
+            border: `1px solid ${BORDER}`,
+            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.6)",
+          }}
         >
           <div
-            className="flex h-14 w-14 items-center justify-center rounded-full text-[16px] font-semibold"
-            style={{ background: CHARCOAL, color: CREAM_SOFT }}
+            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-[16px]"
+            style={{
+              background: CHARCOAL,
+              color: CREAM_SOFT,
+              fontFamily: "'Sora', sans-serif",
+              fontWeight: 600,
+              letterSpacing: "0.02em",
+            }}
           >
             {initials(seed)}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-[14px]" style={{ color: CHARCOAL, fontWeight: 500 }}>
-              {displayName || "Unnamed"}
+            <div
+              className="truncate text-[15px]"
+              style={{ color: CHARCOAL, fontWeight: 600, letterSpacing: "-0.01em" }}
+            >
+              {displayShown}
             </div>
             <div className="truncate text-[12.5px]" style={{ color: MUTED }}>
               {user.email}
@@ -141,65 +150,89 @@ function ProfilePage() {
           </div>
         </motion.div>
 
-        {loading ? (
-          <div className="flex items-center justify-center py-8" style={{ color: MUTED }}>
-            <Loader2 className="h-4 w-4 animate-spin" />
-          </div>
-        ) : (
-          <form onSubmit={save} className="flex flex-col gap-2.5">
-            <label className="flex flex-col gap-1.5">
-              <span className="text-[11px] uppercase tracking-[0.14em]" style={{ color: MUTED }}>
-                Display name
-              </span>
-              <Field icon={<User className="h-4 w-4" strokeWidth={1.6} />} delay={0.05}>
-                <input
-                  type="text"
-                  placeholder="What should we call you?"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  maxLength={64}
-                  className={inputClass}
-                  style={inputStyle}
-                />
-              </Field>
-            </label>
-
-            <label className="flex flex-col gap-1.5">
-              <span className="text-[11px] uppercase tracking-[0.14em]" style={{ color: MUTED }}>
-                Email
-              </span>
-              <Field icon={<Mail className="h-4 w-4" strokeWidth={1.6} />} delay={0.1}>
-                <input
-                  type="email"
-                  value={user.email ?? ""}
-                  disabled
-                  className={inputClass}
-                  style={{ ...inputStyle, opacity: 0.7 }}
-                />
-              </Field>
-            </label>
-
-            {notice && <Notice kind={notice.kind}>{notice.text}</Notice>}
-
-            <div className="pt-1">
-              <PrimaryButton type="submit" loading={saving}>
-                Save changes
-              </PrimaryButton>
+        <SectionLabel>Personal</SectionLabel>
+        <SettingsGroup>
+          {loading ? (
+            <div className="flex items-center justify-center py-6" style={{ color: MUTED }}>
+              <Loader2 className="h-4 w-4 animate-spin" />
             </div>
-          </form>
+          ) : editing ? (
+            <div className="flex items-center gap-3 px-4 py-3">
+              <span
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+                style={{
+                  background: "rgba(28,28,28,0.05)",
+                  color: CHARCOAL,
+                  border: `1px solid ${BORDER}`,
+                }}
+              >
+                <User className="h-4 w-4" strokeWidth={1.8} />
+              </span>
+              <input
+                autoFocus
+                type="text"
+                value={displayName}
+                maxLength={64}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="Your name"
+                className="min-w-0 flex-1 bg-transparent text-[14.5px] outline-none"
+                style={{ color: CHARCOAL, fontWeight: 500 }}
+              />
+              <button
+                onClick={cancelEdit}
+                className="text-[12px]"
+                style={{ color: MUTED }}
+              >
+                Cancel
+              </button>
+              <motion.button
+                whileTap={{ scale: 0.94 }}
+                onClick={save}
+                disabled={saving}
+                className="flex h-8 w-8 items-center justify-center rounded-full disabled:opacity-60"
+                style={{ background: CHARCOAL, color: CREAM_SOFT }}
+                aria-label="Save"
+              >
+                {saving ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Check className="h-3.5 w-3.5" strokeWidth={2.4} />
+                )}
+              </motion.button>
+            </div>
+          ) : (
+            <SettingsRow
+              icon={<User className="h-4 w-4" strokeWidth={1.8} />}
+              title="Display name"
+              value={initialName || "Not set"}
+              onClick={() => setEditing(true)}
+              trailing={<Pencil className="h-3.5 w-3.5" strokeWidth={1.8} style={{ color: MUTED }} />}
+            />
+          )}
+          <SettingsRow
+            icon={<Mail className="h-4 w-4" strokeWidth={1.8} />}
+            title="Email"
+            value={user.email ?? ""}
+          />
+        </SettingsGroup>
+
+        {notice && (
+          <div className="pt-3">
+            <Notice kind={notice.kind}>{notice.text}</Notice>
+          </div>
         )}
 
-        <div className="mt-2 flex items-center gap-3">
-          <div className="h-px flex-1" style={{ background: BORDER }} />
-          <span className="text-[11px] uppercase tracking-[0.14em]" style={{ color: MUTED }}>
-            Session
-          </span>
-          <div className="h-px flex-1" style={{ background: BORDER }} />
-        </div>
-
-        <GhostButton onClick={signOut} icon={<LogOut className="h-4 w-4" strokeWidth={1.8} />}>
-          Sign out
-        </GhostButton>
+        <SectionLabel>Session</SectionLabel>
+        <SettingsGroup>
+          <SettingsRow
+            icon={<LogOut className="h-4 w-4" strokeWidth={1.8} />}
+            title="Sign out"
+            description="You'll need to sign in and unlock again"
+            onClick={signOut}
+            danger
+            chevron
+          />
+        </SettingsGroup>
       </div>
     </>
   );

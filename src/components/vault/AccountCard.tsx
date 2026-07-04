@@ -24,7 +24,6 @@ function initials(source: string): string {
   return chars.toUpperCase();
 }
 
-/* Deterministic warm hue per issuer for the initials chip */
 function hueFor(seed: string): number {
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
@@ -72,94 +71,109 @@ export function AccountCard({ account, now }: Props) {
   return (
     <motion.button
       onClick={copy}
-      whileTap={{ scale: 0.985 }}
-      className="group relative flex w-full items-center gap-3 rounded-[14px] px-3.5 py-3 text-left"
-      style={{
-        background: CREAM_SOFT,
-        border: `1px solid ${BORDER}`,
-        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.5), 0 1px 2px rgba(28,28,28,0.04)",
-      }}
+      whileTap={{ scale: 0.99, backgroundColor: "rgba(28,28,28,0.03)" }}
+      className="group relative flex w-full flex-col gap-2 px-4 py-3 text-left"
+      style={{ background: "transparent" }}
     >
-      <div
-        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] text-[13px] font-semibold tracking-wide"
-        style={{ background: chipBg, color: chipFg, border: `1px solid ${BORDER}` }}
-      >
-        {initials(seed)}
+      <div className="flex items-center gap-3">
+        <div
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] text-[12.5px]"
+          style={{
+            background: chipBg,
+            color: chipFg,
+            border: `1px solid ${BORDER}`,
+            fontFamily: "'Sora', sans-serif",
+            fontWeight: 600,
+            letterSpacing: "0.02em",
+          }}
+        >
+          {initials(seed)}
+        </div>
+
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div
+            className="truncate text-[14px]"
+            style={{ color: CHARCOAL, fontWeight: 600, letterSpacing: "-0.005em" }}
+          >
+            {account.issuer || "Untitled"}
+          </div>
+          {account.label && (
+            <div className="truncate text-[11.5px]" style={{ color: MUTED }}>
+              {account.label}
+            </div>
+          )}
+        </div>
+
+        <RingTimer progress={progress} remaining={remaining} warn={warn} />
       </div>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex items-center justify-between gap-2">
-          <div className="min-w-0">
-            <div className="truncate text-[13.5px] font-medium" style={{ color: CHARCOAL }}>
-              {account.issuer || "Untitled"}
-            </div>
-            {account.label && (
-              <div className="truncate text-[11.5px]" style={{ color: MUTED }}>
-                {account.label}
-              </div>
-            )}
-          </div>
-          <AnimatePresence mode="wait" initial={false}>
-            {copied ? (
-              <motion.div
-                key="ok"
-                initial={{ opacity: 0, scale: 0.85, y: -2 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.85, y: -2 }}
-                transition={{ type: "spring", stiffness: 500, damping: 26 }}
-                className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px]"
-                style={{ color: CHARCOAL, background: "rgba(28,28,28,0.06)" }}
-              >
-                <Check className="h-3 w-3" strokeWidth={2.2} />
-                Copied
-              </motion.div>
-            ) : (
-              <motion.div
-                key="copy"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.15 }}
-                className="opacity-50"
-                style={{ color: MUTED }}
-              >
-                <Copy className="h-3.5 w-3.5" strokeWidth={1.6} />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+      <div className="flex items-baseline justify-between gap-3 pl-[52px]">
+        <AnimatePresence mode="popLayout" initial={false}>
+          <motion.div
+            key={code}
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.18 }}
+            className="text-[26px] leading-none tabular-nums"
+            style={{
+              color: warn ? DANGER : CHARCOAL,
+              fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+              fontFeatureSettings: "'tnum'",
+              fontWeight: 600,
+              letterSpacing: "0.06em",
+            }}
+          >
+            {formatCode(code)}
+          </motion.div>
+        </AnimatePresence>
 
-        <div className="mt-1 flex items-baseline justify-between gap-3">
-          <AnimatePresence mode="popLayout" initial={false}>
+        <AnimatePresence mode="wait" initial={false}>
+          {copied ? (
             <motion.div
-              key={code}
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.18 }}
-              className="font-mono text-[22px] leading-none tracking-[0.14em] tabular-nums"
-              style={{ color: warn ? DANGER : CHARCOAL, fontFeatureSettings: "'tnum'" }}
+              key="ok"
+              initial={{ opacity: 0, scale: 0.85 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.85 }}
+              transition={{ type: "spring", stiffness: 500, damping: 26 }}
+              className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px]"
+              style={{
+                color: CREAM_SOFT,
+                background: CHARCOAL,
+                fontWeight: 500,
+              }}
             >
-              {formatCode(code)}
+              <Check className="h-3 w-3" strokeWidth={2.4} />
+              Copied
             </motion.div>
-          </AnimatePresence>
-          <RingTimer progress={progress} remaining={remaining} warn={warn} />
-        </div>
+          ) : (
+            <motion.div
+              key="copy"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.6 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              style={{ color: MUTED }}
+            >
+              <Copy className="h-3.5 w-3.5" strokeWidth={1.7} />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </motion.button>
   );
 }
 
 function RingTimer({ progress, remaining, warn }: { progress: number; remaining: number; warn: boolean }) {
-  const size = 24;
-  const stroke = 2;
+  const size = 28;
+  const stroke = 2.2;
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
   const dash = c * (1 - progress);
   const color = warn ? DANGER : CHARCOAL;
 
   return (
-    <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
+    <div className="relative flex shrink-0 items-center justify-center" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="-rotate-90">
         <circle cx={size / 2} cy={size / 2} r={r} stroke={BORDER} strokeWidth={stroke} fill="none" />
         <circle
@@ -175,7 +189,15 @@ function RingTimer({ progress, remaining, warn }: { progress: number; remaining:
           style={{ transition: "stroke-dashoffset 0.24s linear, stroke 0.2s ease" }}
         />
       </svg>
-      <span className="absolute text-[9.5px] font-medium tabular-nums" style={{ color, fontFeatureSettings: "'tnum'" }}>
+      <span
+        className="absolute text-[10px] tabular-nums"
+        style={{
+          color,
+          fontFeatureSettings: "'tnum'",
+          fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+          fontWeight: 600,
+        }}
+      >
         {remaining}
       </span>
     </div>
