@@ -778,13 +778,22 @@ export default function Onboarding() {
 
         <div className="relative flex-1 overflow-hidden">
           <AnimatePresence mode="wait" initial={false}>
-            {step === 0 && <div key="s0" className="absolute inset-0"><StepWelcome next={next} /></div>}
-            {step === 1 && <div key="s1" className="absolute inset-0"><StepFeatures next={next} /></div>}
-            {step === 2 && <div key="s2" className="absolute inset-0"><StepImport next={next} /></div>}
-            {step === 3 && <div key="s3" className="absolute inset-0"><StepBackup next={next} /></div>}
-            {step === 4 && <div key="s4" className="absolute inset-0"><StepNotifications next={next} /></div>}
-            {step === 5 && <div key="s5" className="absolute inset-0"><StepBiometrics next={next} /></div>}
-            {step === 6 && <div key="s6" className="absolute inset-0"><StepDone next={restart} /></div>}
+            <motion.div
+              key={step}
+              initial={{ opacity: 0, y: 12, filter: "blur(6px)" }}
+              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+              exit={{ opacity: 0, y: -8, filter: "blur(6px)" }}
+              transition={{ duration: 0.4, ease: [0.22, 0.9, 0.3, 1] }}
+              className="absolute inset-0"
+            >
+              {step === 0 && <StepWelcome next={next} />}
+              {step === 1 && <StepFeatures next={next} />}
+              {step === 2 && <StepImport next={next} />}
+              {step === 3 && <StepBackup next={next} />}
+              {step === 4 && <StepNotifications next={next} />}
+              {step === 5 && <StepBiometrics next={next} />}
+              {step === 6 && <StepDone next={restart} />}
+            </motion.div>
           </AnimatePresence>
         </div>
       </div>
