@@ -308,37 +308,66 @@ function LockPage() {
           </div>
         </div>
 
+        {/* Biometric FIRST when enrolled — that's the fast path. */}
+        {!isCreate && bioEnrolled && bioAvailable && (
+          <motion.button
+            type="button"
+            onClick={handleBiometricUnlock}
+            disabled={bioBusy || loading}
+            whileTap={{ scale: 0.985, opacity: 0.9 }}
+            transition={soft}
+            className="flex h-[46px] w-full items-center justify-center gap-2 rounded-[10px] text-[15px] disabled:opacity-60"
+            style={{
+              background: CHARCOAL,
+              color: CREAM_SOFT,
+              fontWeight: 500,
+              letterSpacing: "-0.005em",
+              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.08)",
+            }}
+          >
+            {bioBusy ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <>
+                <Fingerprint className="h-[17px] w-[17px]" strokeWidth={1.8} />
+                <span>Unlock with biometrics</span>
+              </>
+            )}
+          </motion.button>
+        )}
+
+        {!isCreate && bioEnrolled && bioAvailable && (
+          <div className="flex items-center gap-3">
+            <div className="h-px flex-1" style={{ background: "rgba(28,28,28,0.1)" }} />
+            <span className="text-[11px] uppercase tracking-[0.14em]" style={{ color: MUTED }}>
+              or use passphrase
+            </span>
+            <div className="h-px flex-1" style={{ background: "rgba(28,28,28,0.1)" }} />
+          </div>
+        )}
+
         <form onSubmit={isCreate ? handleCreate : handleUnlock} className="flex flex-col gap-2.5">
-          <Field icon={<Lock className="h-4 w-4" strokeWidth={1.6} />} delay={0.05}>
-            <input
-              type="password"
-              autoComplete={isCreate ? "new-password" : "current-password"}
-              autoFocus
-              required
-              minLength={isCreate ? 10 : 1}
-              placeholder={isCreate ? "Create a memorable passphrase" : "Master passphrase"}
-              value={passphrase}
-              onChange={(e) => setPassphrase(e.target.value)}
-              className={inputClass}
-              style={inputStyle}
-            />
-          </Field>
+          <PasswordField
+            value={passphrase}
+            onChange={setPassphrase}
+            autoComplete={isCreate ? "new-password" : "current-password"}
+            autoFocus={!bioEnrolled}
+            minLength={isCreate ? 10 : 1}
+            placeholder={isCreate ? "Create a memorable passphrase" : "Master passphrase"}
+            delay={0.05}
+          />
 
           {isCreate && (
             <>
-              <Field icon={<Lock className="h-4 w-4" strokeWidth={1.6} />} delay={0.1}>
-                <input
-                  type="password"
-                  autoComplete="new-password"
-                  required
-                  minLength={10}
-                  placeholder="Confirm passphrase"
-                  value={confirmPass}
-                  onChange={(e) => setConfirmPass(e.target.value)}
-                  className={inputClass}
-                  style={inputStyle}
-                />
-              </Field>
+              <StrengthMeter value={passphrase} />
+              <PasswordField
+                value={confirmPass}
+                onChange={setConfirmPass}
+                autoComplete="new-password"
+                minLength={10}
+                placeholder="Confirm passphrase"
+                delay={0.1}
+              />
               <Field icon={<KeyRound className="h-4 w-4" strokeWidth={1.6} />} delay={0.15}>
                 <input
                   type="text"
@@ -356,37 +385,17 @@ function LockPage() {
           {notice && <Notice kind={notice.kind}>{notice.text}</Notice>}
 
           <div className="pt-1">
-            <PrimaryButton type="submit" loading={loading}>
+            <PrimaryButton
+              type="submit"
+              loading={loading}
+              disabled={
+                !passphrase ||
+                (isCreate && (scoreStrength(passphrase) < 2 || passphrase !== confirmPass))
+              }
+            >
               {isCreate ? "Create vault" : "Unlock"}
             </PrimaryButton>
           </div>
-
-          {!isCreate && bioEnrolled && bioAvailable && (
-            <motion.button
-              type="button"
-              onClick={handleBiometricUnlock}
-              disabled={bioBusy || loading}
-              whileTap={{ scale: 0.985, opacity: 0.9 }}
-              transition={soft}
-              className="mt-1 flex h-[44px] w-full items-center justify-center gap-2 rounded-[10px] text-[14px] disabled:opacity-60"
-              style={{
-                background: CREAM_SOFT,
-                color: CHARCOAL,
-                border: `1px solid rgba(28,28,28,0.12)`,
-                fontWeight: 500,
-                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.6)",
-              }}
-            >
-              {bioBusy ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <>
-                  <Fingerprint className="h-4 w-4" strokeWidth={1.8} />
-                  <span>Unlock with biometrics</span>
-                </>
-              )}
-            </motion.button>
-          )}
 
           {isCreate && bioAvailable && isBiometricPending() && (
             <p
@@ -406,7 +415,7 @@ function LockPage() {
             A printable recovery sheet is coming in a later step.
           </p>
         ) : (
-          <div className="text-center">
+          <div className="flex flex-col items-center gap-2 pt-1">
             <TextLink
               onClick={async () => {
                 const ok = window.confirm(
@@ -423,7 +432,6 @@ function LockPage() {
                   setPassphrase("");
                   setPassphraseHint(null);
                   setMode("create");
-
                 } catch (err) {
                   setNotice({ kind: "error", text: err instanceof Error ? err.message : "Reset failed." });
                 } finally {
@@ -433,8 +441,21 @@ function LockPage() {
             >
               Forgot passphrase? Reset vault
             </TextLink>
+            <button
+              type="button"
+              onClick={async () => {
+                await supabase.auth.signOut();
+                navigate({ to: "/auth", replace: true });
+              }}
+              className="flex items-center gap-1.5 text-[12.5px] transition-opacity hover:opacity-100"
+              style={{ color: MUTED, opacity: 0.75 }}
+            >
+              <LogOut className="h-3.5 w-3.5" strokeWidth={1.6} />
+              <span>Sign out</span>
+            </button>
           </div>
         )}
+
       </div>
     </AegisScreen>
   );
