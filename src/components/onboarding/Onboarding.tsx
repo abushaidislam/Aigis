@@ -243,18 +243,20 @@ function Lede({ children }: { children: ReactNode }) {
 
 function Eyebrow({ children }: { children: ReactNode }) {
   return (
-    <span
-      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] uppercase"
-      style={{
-        color: CHARCOAL,
-        background: CREAM_SOFT,
-        border: `1px solid ${BORDER}`,
-        letterSpacing: "0.12em",
-        fontWeight: 500,
-      }}
-    >
-      {children}
-    </span>
+    <div className="flex">
+      <span
+        className="inline-flex w-fit items-center gap-1.5 self-start rounded-full px-2.5 py-1 text-[11px] uppercase"
+        style={{
+          color: CHARCOAL,
+          background: CREAM_SOFT,
+          border: `1px solid ${BORDER}`,
+          letterSpacing: "0.12em",
+          fontWeight: 500,
+        }}
+      >
+        {children}
+      </span>
+    </div>
   );
 }
 
