@@ -11,11 +11,20 @@ import {
   KDF_ALGORITHM,
 } from "@/lib/vault-crypto";
 import { setVaultKey } from "@/lib/vault-session";
-import { Lock, KeyRound, Sparkles } from "lucide-react";
+import {
+  disableBiometric,
+  enrollBiometric,
+  isBiometricEnabled,
+  isBiometricPending,
+  isBiometricSupported,
+  unlockWithBiometric,
+} from "@/lib/biometric";
+import { Lock, KeyRound, Sparkles, Fingerprint } from "lucide-react";
 import {
   AegisScreen,
   BrandBar,
   CHARCOAL,
+  CREAM_SOFT,
   Display,
   Eyebrow,
   Field,
@@ -30,6 +39,7 @@ import {
   soft,
 } from "@/components/aegis/chrome";
 import { Loader2 } from "lucide-react";
+
 
 const searchSchema = z.object({ redirect: z.string().optional() });
 
@@ -62,6 +72,22 @@ function LockPage() {
   const [passphraseHint, setPassphraseHint] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState<{ kind: "error" | "info"; text: string } | null>(null);
+  const [bioAvailable, setBioAvailable] = useState(false);
+  const [bioEnrolled, setBioEnrolled] = useState(false);
+  const [bioBusy, setBioBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const supported = await isBiometricSupported();
+      if (cancelled) return;
+      setBioAvailable(supported);
+      setBioEnrolled(isBiometricEnabled(user.id));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -89,6 +115,38 @@ function LockPage() {
     };
   }, [user.id]);
 
+  const maybeEnrollBiometric = async (dek: CryptoKey) => {
+    if (!isBiometricPending()) return;
+    if (!(await isBiometricSupported())) return;
+    try {
+      await enrollBiometric({ userId: user.id, userEmail: user.email ?? user.id, dek });
+      setBioEnrolled(true);
+    } catch {
+      // Silent: they can enable it later from Security settings.
+    }
+  };
+
+  const consumeImportIntent = () => {
+    try {
+      const intent = window.localStorage.getItem("aegis.onboarding.intent");
+      if (!intent) return null;
+      window.localStorage.removeItem("aegis.onboarding.intent");
+      return intent;
+    } catch {
+      return null;
+    }
+  };
+
+  const routeAfterUnlock = () => {
+    const intent = consumeImportIntent();
+    if (intent === "scan" || intent === "manual") {
+      navigate({ to: "/vault/new", replace: true });
+    } else {
+      navigate({ to: safeRedirect(search.redirect), replace: true });
+    }
+  };
+
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setNotice(null);
@@ -113,13 +171,15 @@ function LockPage() {
       });
       if (error) throw error;
       setVaultKey(dek);
-      navigate({ to: safeRedirect(search.redirect), replace: true });
+      await maybeEnrollBiometric(dek);
+      routeAfterUnlock();
     } catch (err) {
       setNotice({ kind: "error", text: err instanceof Error ? err.message : "Could not create vault." });
     } finally {
       setLoading(false);
     }
   };
+
 
   const handleUnlock = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -142,7 +202,8 @@ function LockPage() {
         toBytes(data.recovery_wrapped_key_iv),
       );
       setVaultKey(dek);
-      navigate({ to: safeRedirect(search.redirect), replace: true });
+      await maybeEnrollBiometric(dek);
+      routeAfterUnlock();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Could not unlock.";
       setNotice({
@@ -155,6 +216,32 @@ function LockPage() {
       setLoading(false);
     }
   };
+
+  const handleBiometricUnlock = async () => {
+    setNotice(null);
+    setBioBusy(true);
+    try {
+      const dek = await unlockWithBiometric(user.id);
+      setVaultKey(dek);
+      routeAfterUnlock();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Biometric unlock failed.";
+      // If the stored blob is broken (e.g. cleared), drop it so user isn't stuck.
+      if (/isn't set up|NotAllowed|InvalidState/i.test(msg)) {
+        disableBiometric(user.id);
+        setBioEnrolled(false);
+      }
+      setNotice({
+        kind: "error",
+        text: /NotAllowed/i.test(msg)
+          ? "Biometric check was cancelled."
+          : msg,
+      });
+    } finally {
+      setBioBusy(false);
+    }
+  };
+
 
   if (mode === "loading") {
     return (
@@ -260,7 +347,44 @@ function LockPage() {
               {isCreate ? "Create vault" : "Unlock"}
             </PrimaryButton>
           </div>
+
+          {!isCreate && bioEnrolled && bioAvailable && (
+            <motion.button
+              type="button"
+              onClick={handleBiometricUnlock}
+              disabled={bioBusy || loading}
+              whileTap={{ scale: 0.985, opacity: 0.9 }}
+              transition={soft}
+              className="mt-1 flex h-[44px] w-full items-center justify-center gap-2 rounded-[10px] text-[14px] disabled:opacity-60"
+              style={{
+                background: CREAM_SOFT,
+                color: CHARCOAL,
+                border: `1px solid rgba(28,28,28,0.12)`,
+                fontWeight: 500,
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.6)",
+              }}
+            >
+              {bioBusy ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  <Fingerprint className="h-4 w-4" strokeWidth={1.8} />
+                  <span>Unlock with biometrics</span>
+                </>
+              )}
+            </motion.button>
+          )}
+
+          {isCreate && bioAvailable && isBiometricPending() && (
+            <p
+              className="pt-1 text-center text-[11.5px]"
+              style={{ color: MUTED }}
+            >
+              We'll set up Face ID / fingerprint right after your vault is created.
+            </p>
+          )}
         </form>
+
 
         {isCreate ? (
           <p className="text-center text-[11.5px] leading-snug" style={{ color: MUTED }}>
@@ -281,9 +405,12 @@ function LockPage() {
                 try {
                   await supabase.from("vault_accounts").delete().eq("user_id", user.id);
                   await supabase.from("vault_meta").delete().eq("user_id", user.id);
+                  disableBiometric(user.id);
+                  setBioEnrolled(false);
                   setPassphrase("");
                   setPassphraseHint(null);
                   setMode("create");
+
                 } catch (err) {
                   setNotice({ kind: "error", text: err instanceof Error ? err.message : "Reset failed." });
                 } finally {

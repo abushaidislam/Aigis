@@ -193,17 +193,23 @@ function PrimaryButton({
   children,
   onClick,
   icon,
+  loading,
+  disabled,
 }: {
   children: ReactNode;
   onClick?: () => void;
   icon?: ReactNode;
+  loading?: boolean;
+  disabled?: boolean;
 }) {
+  const isDisabled = disabled || loading;
   return (
     <motion.button
       onClick={onClick}
-      whileTap={{ scale: 0.985, opacity: 0.85 }}
+      disabled={isDisabled}
+      whileTap={isDisabled ? undefined : { scale: 0.985, opacity: 0.85 }}
       transition={spring}
-      className="group relative flex h-[46px] w-full items-center justify-center gap-2 rounded-[10px] text-[15px]"
+      className="group relative flex h-[46px] w-full items-center justify-center gap-2 rounded-[10px] text-[15px] disabled:opacity-60"
       style={{
         background: CHARCOAL,
         color: CREAM_SOFT,
@@ -214,18 +220,23 @@ function PrimaryButton({
       onFocus={(e) => (e.currentTarget.style.boxShadow = `${INSET_SHADOW}, ${FOCUS_SHADOW}`)}
       onBlur={(e) => (e.currentTarget.style.boxShadow = INSET_SHADOW)}
     >
-      <span className="flex items-center gap-2">
-        {children}
-        {icon ?? (
-          <ArrowRight
-            className="h-[15px] w-[15px] transition-transform duration-300 group-hover:translate-x-0.5"
-            strokeWidth={1.8}
-          />
-        )}
-      </span>
+      {loading ? (
+        <RefreshCw className="h-4 w-4 animate-spin" strokeWidth={1.8} />
+      ) : (
+        <span className="flex items-center gap-2">
+          {children}
+          {icon ?? (
+            <ArrowRight
+              className="h-[15px] w-[15px] transition-transform duration-300 group-hover:translate-x-0.5"
+              strokeWidth={1.8}
+            />
+          )}
+        </span>
+      )}
     </motion.button>
   );
 }
+
 
 function GhostButton({ children, onClick }: { children: ReactNode; onClick?: () => void }) {
   return (
@@ -416,12 +427,14 @@ function ImportOption({
   body,
   onClick,
   delay = 0,
+  active = false,
 }: {
   icon: ReactNode;
   title: string;
   body: string;
   onClick?: () => void;
   delay?: number;
+  active?: boolean;
 }) {
   return (
     <motion.button
@@ -430,8 +443,11 @@ function ImportOption({
       transition={{ ...soft, delay }}
       whileTap={{ scale: 0.99, opacity: 0.9 }}
       onClick={onClick}
-      className="flex w-full items-center gap-3 rounded-[12px] p-3 text-left"
-      style={{ background: CREAM_SOFT, border: `1px solid ${BORDER}` }}
+      className="flex w-full items-center gap-3 rounded-[12px] p-3 text-left transition-colors"
+      style={{
+        background: active ? "rgba(28,28,28,0.05)" : CREAM_SOFT,
+        border: `1px solid ${active ? "rgba(28,28,28,0.25)" : BORDER}`,
+      }}
     >
       <IconChip size={38}>{icon}</IconChip>
       <div className="min-w-0 flex-1">
@@ -442,10 +458,15 @@ function ImportOption({
           {body}
         </div>
       </div>
-      <ArrowRight className="h-4 w-4" style={{ color: "rgba(28,28,28,0.35)" }} strokeWidth={1.8} />
+      {active ? (
+        <Check className="h-4 w-4" style={{ color: CHARCOAL }} strokeWidth={2} />
+      ) : (
+        <ArrowRight className="h-4 w-4" style={{ color: "rgba(28,28,28,0.35)" }} strokeWidth={1.8} />
+      )}
     </motion.button>
   );
 }
+
 
 function NativeSwitch({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   return (
@@ -638,7 +659,26 @@ function StepFeatures({ next }: { next: () => void }) {
   );
 }
 
+const IMPORT_INTENT_KEY = "aegis.onboarding.intent";
+
+function setImportIntent(v: "scan" | "manual" | "backup" | null) {
+  try {
+    if (v === null) window.localStorage.removeItem(IMPORT_INTENT_KEY);
+    else window.localStorage.setItem(IMPORT_INTENT_KEY, v);
+  } catch {
+    /* ignore */
+  }
+}
+
 function StepImport({ next }: { next: () => void }) {
+  const [selected, setSelected] = useState<"scan" | "manual" | "backup" | null>(null);
+
+  const pick = (v: "scan" | "manual" | "backup") => {
+    setSelected(v);
+    setImportIntent(v);
+    setTimeout(next, 280);
+  };
+
   return (
     <Screen>
       <div className="flex flex-1 flex-col justify-center gap-6">
@@ -652,31 +692,42 @@ function StepImport({ next }: { next: () => void }) {
             icon={<QrCode className="h-4 w-4" strokeWidth={1.8} />}
             title="Scan a QR code"
             body="From Google, Authy, 1Password and more."
-            onClick={next}
+            onClick={() => pick("scan")}
             delay={0.05}
+            active={selected === "scan"}
           />
           <ImportOption
             icon={<Upload className="h-4 w-4" strokeWidth={1.8} />}
             title="Import a backup file"
-            body="Encrypted .aegis or JSON exports."
-            onClick={next}
+            body="Coming soon — we'll notify you."
+            onClick={() => pick("backup")}
             delay={0.12}
+            active={selected === "backup"}
           />
           <ImportOption
             icon={<KeyRound className="h-4 w-4" strokeWidth={1.8} />}
             title="Enter a setup key"
             body="Add manually with a Base32 secret."
-            onClick={next}
+            onClick={() => pick("manual")}
             delay={0.19}
+            active={selected === "manual"}
           />
         </div>
       </div>
       <div className="shrink-0 pb-[max(20px,env(safe-area-inset-bottom))] pt-2 text-center">
-        <TextLink onClick={next}>I'll do this later</TextLink>
+        <TextLink
+          onClick={() => {
+            setImportIntent(null);
+            next();
+          }}
+        >
+          I'll do this later
+        </TextLink>
       </div>
     </Screen>
   );
 }
+
 
 function StepBackup({ next }: { next: () => void }) {
   const [on, setOn] = useState(true);
@@ -711,6 +762,57 @@ function StepBackup({ next }: { next: () => void }) {
 }
 
 function StepNotifications({ next }: { next: () => void }) {
+  const [permission, setPermission] = useState<NotificationPermission | "unsupported">("default");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!("Notification" in window)) {
+      setPermission("unsupported");
+      return;
+    }
+    setPermission(Notification.permission);
+  }, []);
+
+  const request = async () => {
+    if (permission === "unsupported") {
+      next();
+      return;
+    }
+    if (permission === "granted") {
+      next();
+      return;
+    }
+    setBusy(true);
+    try {
+      const result = await Notification.requestPermission();
+      setPermission(result);
+      // Quick success ping so the user knows it took.
+      if (result === "granted") {
+        try {
+          new Notification("Aegis is watching", {
+            body: "You'll only hear from us for sign-in requests and alerts.",
+            silent: true,
+          });
+        } catch {
+          /* ignore */
+        }
+      }
+      setTimeout(next, 380);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const label =
+    permission === "granted"
+      ? "Notifications enabled"
+      : permission === "denied"
+        ? "Blocked in browser"
+        : permission === "unsupported"
+          ? "Not available here"
+          : "Allow notifications";
+
   return (
     <Screen>
       <div className="flex flex-1 flex-col items-center justify-center gap-6 text-center">
@@ -721,19 +823,80 @@ function StepNotifications({ next }: { next: () => void }) {
           <Eyebrow>Notifications</Eyebrow>
           <Display>Only when it matters.</Display>
           <Lede>Get a quiet nudge for sign-in requests and security alerts. Nothing else.</Lede>
+          {permission === "denied" && (
+            <p className="pt-1 text-[12px]" style={{ color: MUTED, maxWidth: "32ch" }}>
+              Enable notifications from your browser's site settings if you change your mind.
+            </p>
+          )}
         </div>
       </div>
       <div className="shrink-0 space-y-3 pb-[max(20px,env(safe-area-inset-bottom))] pt-2">
-        <PrimaryButton onClick={next}>Allow notifications</PrimaryButton>
+        <PrimaryButton
+          onClick={request}
+          loading={busy}
+          disabled={permission === "denied"}
+        >
+          {label}
+        </PrimaryButton>
         <div className="text-center">
-          <TextLink onClick={next}>Not now</TextLink>
+          <TextLink onClick={next}>{permission === "granted" ? "Continue" : "Not now"}</TextLink>
         </div>
       </div>
     </Screen>
   );
 }
 
+
 function StepBiometrics({ next }: { next: () => void }) {
+  const [supported, setSupported] = useState<boolean | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState<"idle" | "queued" | "unavailable">("idle");
+
+  useEffect(() => {
+    let cancelled = false;
+    import("@/lib/biometric").then(async ({ isBiometricSupported }) => {
+      const ok = await isBiometricSupported();
+      if (!cancelled) setSupported(ok);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const enable = async () => {
+    setBusy(true);
+    try {
+      const { isBiometricSupported, markBiometricPending } = await import("@/lib/biometric");
+      const ok = await isBiometricSupported();
+      if (!ok) {
+        setStatus("unavailable");
+        setBusy(false);
+        return;
+      }
+      // Vault DEK doesn't exist yet — flag it, actual WebAuthn enrollment
+      // happens right after the user creates/unlocks their vault.
+      markBiometricPending();
+      setStatus("queued");
+      setBusy(false);
+      // Small delay so the confirmation ticks in.
+      setTimeout(next, 480);
+    } catch {
+      setStatus("unavailable");
+      setBusy(false);
+    }
+  };
+
+  const primaryLabel =
+    status === "queued"
+      ? "Ready — armed for first unlock"
+      : status === "unavailable"
+        ? "Not available on this device"
+        : supported === false
+          ? "Not available on this device"
+          : "Enable biometrics";
+
+  const disabled = busy || status === "queued" || supported === false || status === "unavailable";
+
   return (
     <Screen>
       <div className="flex flex-1 flex-col items-center justify-center gap-6 text-center">
@@ -744,17 +907,33 @@ function StepBiometrics({ next }: { next: () => void }) {
           <Eyebrow>Unlock</Eyebrow>
           <Display>Just a glance.</Display>
           <Lede>Use Face ID or your fingerprint so only you can open Aegis.</Lede>
+          {supported === false && (
+            <p className="pt-1 text-[12px]" style={{ color: MUTED, maxWidth: "32ch" }}>
+              This browser doesn't expose a platform biometric. You'll use your master
+              passphrase instead — that's fine, it's the source of truth anyway.
+            </p>
+          )}
+          {status === "queued" && (
+            <p className="pt-1 text-[12px]" style={{ color: MUTED, maxWidth: "32ch" }}>
+              We'll ask for Face ID / fingerprint right after you set your master passphrase.
+            </p>
+          )}
         </div>
       </div>
       <div className="shrink-0 space-y-3 pb-[max(20px,env(safe-area-inset-bottom))] pt-2">
-        <PrimaryButton onClick={next}>Enable biometrics</PrimaryButton>
+        <PrimaryButton onClick={disabled ? next : enable} loading={busy}>
+          {primaryLabel}
+        </PrimaryButton>
         <div className="text-center">
-          <TextLink onClick={next}>Use passcode instead</TextLink>
+          <TextLink onClick={next}>
+            {status === "queued" ? "Continue" : "Use passcode instead"}
+          </TextLink>
         </div>
       </div>
     </Screen>
   );
 }
+
 
 function StepDone({ next }: { next: () => void }) {
   return (
