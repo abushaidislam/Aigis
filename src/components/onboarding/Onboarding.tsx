@@ -734,6 +734,55 @@ function StepNotifications({ next }: { next: () => void }) {
 }
 
 function StepBiometrics({ next }: { next: () => void }) {
+  const [supported, setSupported] = useState<boolean | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState<"idle" | "queued" | "unavailable">("idle");
+
+  useEffect(() => {
+    let cancelled = false;
+    import("@/lib/biometric").then(async ({ isBiometricSupported }) => {
+      const ok = await isBiometricSupported();
+      if (!cancelled) setSupported(ok);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const enable = async () => {
+    setBusy(true);
+    try {
+      const { isBiometricSupported, markBiometricPending } = await import("@/lib/biometric");
+      const ok = await isBiometricSupported();
+      if (!ok) {
+        setStatus("unavailable");
+        setBusy(false);
+        return;
+      }
+      // Vault DEK doesn't exist yet — flag it, actual WebAuthn enrollment
+      // happens right after the user creates/unlocks their vault.
+      markBiometricPending();
+      setStatus("queued");
+      setBusy(false);
+      // Small delay so the confirmation ticks in.
+      setTimeout(next, 480);
+    } catch {
+      setStatus("unavailable");
+      setBusy(false);
+    }
+  };
+
+  const primaryLabel =
+    status === "queued"
+      ? "Ready — armed for first unlock"
+      : status === "unavailable"
+        ? "Not available on this device"
+        : supported === false
+          ? "Not available on this device"
+          : "Enable biometrics";
+
+  const disabled = busy || status === "queued" || supported === false || status === "unavailable";
+
   return (
     <Screen>
       <div className="flex flex-1 flex-col items-center justify-center gap-6 text-center">
@@ -744,17 +793,33 @@ function StepBiometrics({ next }: { next: () => void }) {
           <Eyebrow>Unlock</Eyebrow>
           <Display>Just a glance.</Display>
           <Lede>Use Face ID or your fingerprint so only you can open Aegis.</Lede>
+          {supported === false && (
+            <p className="pt-1 text-[12px]" style={{ color: MUTED, maxWidth: "32ch" }}>
+              This browser doesn't expose a platform biometric. You'll use your master
+              passphrase instead — that's fine, it's the source of truth anyway.
+            </p>
+          )}
+          {status === "queued" && (
+            <p className="pt-1 text-[12px]" style={{ color: MUTED, maxWidth: "32ch" }}>
+              We'll ask for Face ID / fingerprint right after you set your master passphrase.
+            </p>
+          )}
         </div>
       </div>
       <div className="shrink-0 space-y-3 pb-[max(20px,env(safe-area-inset-bottom))] pt-2">
-        <PrimaryButton onClick={next}>Enable biometrics</PrimaryButton>
+        <PrimaryButton onClick={disabled ? next : enable} loading={busy}>
+          {primaryLabel}
+        </PrimaryButton>
         <div className="text-center">
-          <TextLink onClick={next}>Use passcode instead</TextLink>
+          <TextLink onClick={next}>
+            {status === "queued" ? "Continue" : "Use passcode instead"}
+          </TextLink>
         </div>
       </div>
     </Screen>
   );
 }
+
 
 function StepDone({ next }: { next: () => void }) {
   return (
