@@ -1,8 +1,9 @@
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
-import { KeyRound, RotateCcw, Timer, Sparkles, Lock } from "lucide-react";
-import { MUTED, Notice } from "@/components/aegis/chrome";
+import { KeyRound, RotateCcw, Timer, Sparkles, Lock, ShieldCheck } from "lucide-react";
+import { BORDER, CHARCOAL, CREAM_SOFT, MUTED, Notice, soft } from "@/components/aegis/chrome";
 import {
   AppBar,
   LargeTitle,
@@ -81,6 +82,36 @@ function SecurityPage() {
       />
 
       <div className="flex flex-1 flex-col gap-1 overflow-y-auto pt-1 pb-[calc(96px+env(safe-area-inset-bottom))]">
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={soft}
+          className="flex items-center gap-3.5 rounded-[16px] px-4 py-4"
+          style={{
+            background: CREAM_SOFT,
+            border: `1px solid ${BORDER}`,
+            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.6)",
+          }}
+        >
+          <div
+            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full"
+            style={{ background: CHARCOAL, color: CREAM_SOFT }}
+          >
+            <ShieldCheck className="h-6 w-6" strokeWidth={1.7} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div
+              className="truncate text-[15px]"
+              style={{ color: CHARCOAL, fontWeight: 600, letterSpacing: "-0.01em" }}
+            >
+              Vault unlocked
+            </div>
+            <div className="truncate text-[12.5px]" style={{ color: MUTED }}>
+              End-to-end encrypted on this device
+            </div>
+          </div>
+        </motion.div>
+
         <SectionLabel>Vault</SectionLabel>
         <SettingsGroup>
           <SettingsRow
