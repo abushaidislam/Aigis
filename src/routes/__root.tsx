@@ -118,6 +118,28 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const router = useRouter();
+
+  useEffect(() => {
+    let mounted = true;
+    import("@/integrations/supabase/client").then(({ supabase }) => {
+      if (!mounted) return;
+      const { data } = supabase.auth.onAuthStateChange((event) => {
+        if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") return;
+        router.invalidate();
+        if (event !== "SIGNED_OUT") queryClient.invalidateQueries();
+      });
+      // Store for cleanup
+      (window as unknown as { __aegis_auth_sub?: { unsubscribe: () => void } }).__aegis_auth_sub =
+        data.subscription;
+    });
+    return () => {
+      mounted = false;
+      const sub = (window as unknown as { __aegis_auth_sub?: { unsubscribe: () => void } })
+        .__aegis_auth_sub;
+      sub?.unsubscribe();
+    };
+  }, [queryClient, router]);
 
   return (
     <QueryClientProvider client={queryClient}>
