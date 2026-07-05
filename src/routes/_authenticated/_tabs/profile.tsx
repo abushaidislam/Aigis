@@ -172,9 +172,15 @@ function ProfilePage() {
     }
   };
 
-  const handleAvatarPick = () => {
+  const openAvatarSheet = () => {
     if (avatarBusy) return;
-    fileRef.current?.click();
+    setAvatarSheet(true);
+  };
+
+  const pickAvatarFile = () => {
+    setAvatarSheet(false);
+    // Give the sheet a beat to close before the OS picker steals focus.
+    setTimeout(() => fileRef.current?.click(), 60);
   };
 
   const handleAvatarFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -210,8 +216,8 @@ function ProfilePage() {
   };
 
   const handleAvatarRemove = async () => {
+    setAvatarSheet(false);
     if (!avatarPath || avatarBusy) return;
-    if (!window.confirm("Remove your profile photo?")) return;
     setAvatarBusy(true);
     setNotice(null);
     try {
