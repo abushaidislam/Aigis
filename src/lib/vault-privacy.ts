@@ -75,10 +75,13 @@ export function setHideCodes(value: boolean) {
   emit();
 
   if (userId) {
-    void supabase
+    supabase
       .from("profiles")
       .update({ hide_codes_pref: value })
-      .eq("id", userId);
+      .eq("id", userId)
+      .then(({ error }) => {
+        if (error) console.error("[vault-privacy] persist failed", error);
+      });
   }
 }
 
