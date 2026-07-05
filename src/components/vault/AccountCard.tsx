@@ -564,7 +564,6 @@ export function AccountCard({ account, now, isFavorite, onToggleFavorite, onDele
 
             {/* Code display (revealed or dotted) */}
             <motion.div
-              layout
               className="relative mb-2 flex flex-col items-center gap-1.5 overflow-hidden rounded-[16px] py-5"
               style={{
                 background: "#fff",
