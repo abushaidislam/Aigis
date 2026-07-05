@@ -39,6 +39,7 @@ export const Route = createFileRoute("/_authenticated/_tabs/vault")({
 function VaultPage() {
   const navigate = useNavigate();
   const unlocked = useVaultUnlocked();
+  const { user } = Route.useRouteContext();
 
   useActivityKeepAlive();
 
@@ -46,6 +47,21 @@ function VaultPage() {
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [query, setQuery] = useState("");
+  const [favorites, setFavorites] = useState<Set<string>>(() => new Set());
+
+  useEffect(() => {
+    setFavorites(loadFavorites(user.id));
+  }, [user.id]);
+
+  const toggleFavorite = (id: string) => {
+    setFavorites((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      saveFavorites(user.id, next);
+      return next;
+    });
+  };
 
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 250);
