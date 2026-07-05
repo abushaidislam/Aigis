@@ -21,6 +21,7 @@ import { Route as AuthenticatedLockedRouteRouteImport } from './routes/_authenti
 import { Route as AuthenticatedTabsVaultRouteImport } from './routes/_authenticated/_tabs/vault'
 import { Route as AuthenticatedTabsSecurityRouteImport } from './routes/_authenticated/_tabs/security'
 import { Route as AuthenticatedTabsProfileRouteImport } from './routes/_authenticated/_tabs/profile'
+import { Route as AuthenticatedLockedVaultRecoveryRouteImport } from './routes/_authenticated/_locked/vault_.recovery'
 import { Route as AuthenticatedLockedVaultNewRouteImport } from './routes/_authenticated/_locked/vault_.new'
 
 const AuthRoute = AuthRouteImport.update({
@@ -83,6 +84,12 @@ const AuthenticatedTabsProfileRoute =
     path: '/profile',
     getParentRoute: () => AuthenticatedTabsRoute,
   } as any)
+const AuthenticatedLockedVaultRecoveryRoute =
+  AuthenticatedLockedVaultRecoveryRouteImport.update({
+    id: '/vault_/recovery',
+    path: '/vault/recovery',
+    getParentRoute: () => AuthenticatedLockedRouteRoute,
+  } as any)
 const AuthenticatedLockedVaultNewRoute =
   AuthenticatedLockedVaultNewRouteImport.update({
     id: '/vault_/new',
@@ -101,6 +108,7 @@ export interface FileRoutesByFullPath {
   '/security': typeof AuthenticatedTabsSecurityRoute
   '/vault': typeof AuthenticatedTabsVaultRoute
   '/vault/new': typeof AuthenticatedLockedVaultNewRoute
+  '/vault/recovery': typeof AuthenticatedLockedVaultRecoveryRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -113,6 +121,7 @@ export interface FileRoutesByTo {
   '/security': typeof AuthenticatedTabsSecurityRoute
   '/vault': typeof AuthenticatedTabsVaultRoute
   '/vault/new': typeof AuthenticatedLockedVaultNewRoute
+  '/vault/recovery': typeof AuthenticatedLockedVaultRecoveryRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -129,6 +138,7 @@ export interface FileRoutesById {
   '/_authenticated/_tabs/security': typeof AuthenticatedTabsSecurityRoute
   '/_authenticated/_tabs/vault': typeof AuthenticatedTabsVaultRoute
   '/_authenticated/_locked/vault_/new': typeof AuthenticatedLockedVaultNewRoute
+  '/_authenticated/_locked/vault_/recovery': typeof AuthenticatedLockedVaultRecoveryRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -143,6 +153,7 @@ export interface FileRouteTypes {
     | '/security'
     | '/vault'
     | '/vault/new'
+    | '/vault/recovery'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -155,6 +166,7 @@ export interface FileRouteTypes {
     | '/security'
     | '/vault'
     | '/vault/new'
+    | '/vault/recovery'
   id:
     | '__root__'
     | '/'
@@ -170,6 +182,7 @@ export interface FileRouteTypes {
     | '/_authenticated/_tabs/security'
     | '/_authenticated/_tabs/vault'
     | '/_authenticated/_locked/vault_/new'
+    | '/_authenticated/_locked/vault_/recovery'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -264,6 +277,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedTabsProfileRouteImport
       parentRoute: typeof AuthenticatedTabsRoute
     }
+    '/_authenticated/_locked/vault_/recovery': {
+      id: '/_authenticated/_locked/vault_/recovery'
+      path: '/vault/recovery'
+      fullPath: '/vault/recovery'
+      preLoaderRoute: typeof AuthenticatedLockedVaultRecoveryRouteImport
+      parentRoute: typeof AuthenticatedLockedRouteRoute
+    }
     '/_authenticated/_locked/vault_/new': {
       id: '/_authenticated/_locked/vault_/new'
       path: '/vault/new'
@@ -276,11 +296,14 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedLockedRouteRouteChildren {
   AuthenticatedLockedVaultNewRoute: typeof AuthenticatedLockedVaultNewRoute
+  AuthenticatedLockedVaultRecoveryRoute: typeof AuthenticatedLockedVaultRecoveryRoute
 }
 
 const AuthenticatedLockedRouteRouteChildren: AuthenticatedLockedRouteRouteChildren =
   {
     AuthenticatedLockedVaultNewRoute: AuthenticatedLockedVaultNewRoute,
+    AuthenticatedLockedVaultRecoveryRoute:
+      AuthenticatedLockedVaultRecoveryRoute,
   }
 
 const AuthenticatedLockedRouteRouteWithChildren =

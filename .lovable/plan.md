@@ -71,10 +71,10 @@ Ordered by user value on top of the current vault:
    already shipped; favorites now use `src/lib/favorites.ts` (localStorage
    per user id), star toggle on each `AccountCard`, and Vault renders two
    groups: "Favorites" pinned above "All accounts".
-2. **Recovery sheet** — printable PDF (issuer names + wrapped recovery
-   key as QR) generated in-browser at vault creation time. Backs up the
-   "if you forget this passphrase, your codes cannot be recovered" line
-   already shown on `/lock`.
+2. ~~**Recovery sheet**~~ — DONE. `/vault/recovery` route builds a
+   printable PDF with the account list plus a QR of the wrapped recovery
+   key (`kdf_algorithm`, `kdf_salt`, `recovery_wrapped_key`, iv).
+   Downloadable via `jspdf` + `qrcode`; linked from the Security tab.
 3. **Bulk import** — parse `otpauth-migration://` QR (Google
    Authenticator export), Aegis JSON, 2FAS JSON. New route
    `_authenticated/_locked/vault_.import.tsx`; reuse existing add flow to

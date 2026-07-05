@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   Check,
   X,
+  FileText,
 } from "lucide-react";
 import {
   BORDER,
@@ -176,6 +177,13 @@ function SecurityPage() {
             title="Change passphrase"
             description="Rotate your master key without re-adding accounts"
             onClick={() => setChangeOpen(true)}
+            chevron
+          />
+          <SettingsRow
+            icon={<FileText className="h-4 w-4" strokeWidth={1.8} />}
+            title="Recovery sheet"
+            description="Printable backup — accounts list + wrapped key QR"
+            onClick={() => navigate({ to: "/vault/recovery" })}
             chevron
           />
         </SettingsGroup>
