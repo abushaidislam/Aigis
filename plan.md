@@ -9,7 +9,7 @@
 
 ---
 
-## Phase 0 — Baseline audit (Week 0, 2 days) ✅ landed
+## Phase 0 — Baseline audit (Week 0, 2 days) ✅ fully landed
 
 Before we write a line of production code, freeze the current state.
 
@@ -18,12 +18,14 @@ Before we write a line of production code, freeze the current state.
       `data-testid`s on interactive elements).
 - [x] **P0** Snapshot bundle size (`vite build` → record `dist/`) as the
       regression baseline. Store in `/perf/baseline.json`.
-- [ ] **P0** Enumerate every route + its auth guard in
-      `/docs/routing.md` (`/`, `/auth`, `/auth/callback`, `/auth/reset-password`,
-      `/onboarding`, `/lock`, `/vault`, `/vault/new`, `/vault/import`,
-      `/vault/recovery`, `/security`, `/profile`).
+- [x] **P0** Enumerate every route + its auth guard in
+      `/docs/routing.md` — 12 current routes tabulated with SSR posture,
+      guard stack, and data dependencies. Includes a public/auth/locked
+      map that the Phase 1.2 RLS CI test consumes directly.
 - [x] **P0** Write `/SECURITY.md` v0 — even a stub — declaring the
       zero-knowledge invariant.
+- [x] **P0** Fix missing peer dep: `@zxing/library@^0.22.0` is now in
+      `package.json` (was flagged in `perf/baseline.json`).
 
 ### Phase 0 findings
 
@@ -37,9 +39,8 @@ Before we write a line of production code, freeze the current state.
     TanStack Start pattern and can be silenced via `// eslint-disable-next-line`
     per route or by tightening the rule's `allowConstantExport`.
   - **No** unused-vars, no-undef, or logic-quality findings.
-- **`vite build`** → required `yarn add @zxing/library@^0.22.0` (missing
-  peer of `@zxing/browser`); server build then succeeded. Add to
-  `package.json` explicitly.
+- **`vite build`** → passes cleanly after locking `@zxing/library` into
+  `package.json` (was previously an unresolved peer of `@zxing/browser`).
 - **Bundle baseline** captured at `/perf/baseline.json` with the top-10
   client chunks and every server-side lib >100 KB. Biggest wins for later:
   code-split `@zxing/browser` (1 MB) and `jspdf`/`html2canvas` behind the
@@ -47,10 +48,13 @@ Before we write a line of production code, freeze the current state.
 - **`SECURITY.md`** v0.1 published at `/SECURITY.md` — documents the
   zero-knowledge invariant, v1 crypto parameters, RLS-only authz stance,
   and the coordinated-disclosure address stub.
+- **`docs/routing.md`** published — 12-route enumeration with the exact
+  guard stack per route and a public / auth / locked map for the CI RLS
+  suite.
 
 **Exit criterion:** ✅ clean typecheck, ✅ baseline snapshot, ✅ security
-stub. Remaining Phase 0 item — route-map doc — bumped to Phase 1 alongside
-the CSP header work.
+stub, ✅ route-map doc. Phase 0 is closed — move on to Phase 1 backend
+architecture hardening.
 
 ---
 

@@ -56,7 +56,11 @@ as a mobile-first PWA on TanStack Start + Supabase.
   planning artifacts requested.
 - `SECURITY.md` v0.1 — zero-knowledge invariant + crypto parameters +
   coordinated-disclosure address stub.
+- `docs/routing.md` — full 12-route enumeration (URL, file, guard stack,
+  SSR posture) + a public / auth / locked map for the CI RLS suite.
 - `perf/baseline.json` — bundle + lint + typecheck snapshot.
+- `@zxing/library@^0.22.0` locked into `package.json` (was previously an
+  unresolved peer of `@zxing/browser`, breaking `vite build`).
 - 4 migrations under `supabase/migrations/20260706*`:
   `profiles.role` (+ `is_admin()` + self-promotion guard trigger),
   `client_errors` table (RLS: INSERT authenticated + anon, SELECT admin,
@@ -70,6 +74,9 @@ as a mobile-first PWA on TanStack Start + Supabase.
   `tests/crypto/vault-crypto.roundtrip.spec.mjs` (KDF determinism,
   wrap/unwrap, encrypt/decrypt, tamper rejection, all green).
 - `tests/README.md` describing how to run the suite with plain `node`.
+
+**Phase 0 in `plan.md` is now fully closed.** Every item checked off,
+findings recorded, exit criterion met.
 
 ### Prioritized backlog (from `plan.md`)
 
