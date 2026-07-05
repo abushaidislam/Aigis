@@ -1,6 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Copy, Check, Star, Trash2, Loader2, X } from "lucide-react";
+import {
+  Copy,
+  Check,
+  Star,
+  Trash2,
+  Loader2,
+  X,
+  Eye,
+  EyeOff,
+  ShieldCheck,
+  Clock3,
+} from "lucide-react";
 import { toast } from "sonner";
 import { generateCode, type DecryptedAccount } from "@/lib/vault-accounts";
 import { BORDER, CHARCOAL, CREAM_SOFT, MUTED, soft } from "@/components/aegis/chrome";
@@ -87,6 +98,8 @@ function hueFor(seed: string): number {
 export function AccountCard({ account, now, isFavorite, onToggleFavorite, onDelete }: Props) {
   const [copied, setCopied] = useState(false);
   const [logoFailed, setLogoFailed] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [revealed, setRevealed] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const pressTimer = useRef<number | null>(null);
@@ -147,14 +160,33 @@ export function AccountCard({ account, now, isFavorite, onToggleFavorite, onDele
   };
 
   const startPress = () => {
-    if (!onDelete) return;
     clearPress();
     longPressedRef.current = false;
     pressTimer.current = window.setTimeout(() => {
       longPressedRef.current = true;
       if (typeof navigator.vibrate === "function") navigator.vibrate(14);
-      setConfirmOpen(true);
+      setRevealed(false);
+      setDetailsOpen(true);
     }, 500);
+  };
+
+  const openDelete = () => {
+    setDetailsOpen(false);
+    // Give the details sheet a beat to unmount before the confirm slides in.
+    window.setTimeout(() => setConfirmOpen(true), 120);
+  };
+
+  const copyFromSheet = async () => {
+    try {
+      const plain = code.replace(/\s/g, "");
+      await navigator.clipboard.writeText(plain);
+      scheduleClipboardClear(plain);
+      setCopied(true);
+      if (typeof navigator.vibrate === "function") navigator.vibrate(6);
+      toast.success(`Code copied · clears in 30s`);
+    } catch {
+      toast.error("Couldn't copy to clipboard.");
+    }
   };
 
   const confirmDelete = async () => {
@@ -196,10 +228,10 @@ export function AccountCard({ account, now, isFavorite, onToggleFavorite, onDele
       onPointerLeave={clearPress}
       onPointerCancel={clearPress}
       onContextMenu={(e) => {
-        if (!onDelete) return;
         e.preventDefault();
         longPressedRef.current = true;
-        setConfirmOpen(true);
+        setRevealed(false);
+        setDetailsOpen(true);
       }}
       whileTap={{ scale: 0.99, backgroundColor: "rgba(28,28,28,0.03)" }}
       className="group relative flex w-full flex-col gap-2 px-4 py-3 text-left"
@@ -356,6 +388,308 @@ export function AccountCard({ account, now, isFavorite, onToggleFavorite, onDele
         </AnimatePresence>
       </div>
     </motion.button>
+    <AnimatePresence>
+      {detailsOpen && (
+        <motion.div
+          key="details-sheet"
+          className="fixed inset-0 z-50 flex items-end justify-center sm:items-center"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <motion.button
+            aria-label="Close"
+            onClick={() => setDetailsOpen(false)}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0"
+            style={{ background: "rgba(28,28,28,0.35)", backdropFilter: "blur(4px)" }}
+          />
+          <motion.div
+            initial={{ y: 40, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 40, opacity: 0 }}
+            transition={soft}
+            className="relative z-10 mx-auto w-full max-w-[440px] rounded-t-[22px] px-5 pb-[max(20px,env(safe-area-inset-bottom))] pt-4 sm:rounded-[22px]"
+            style={{
+              background: CREAM_SOFT,
+              border: `1px solid ${BORDER}`,
+              boxShadow: "0 -12px 40px -12px rgba(0,0,0,0.25)",
+            }}
+          >
+            <div
+              aria-hidden
+              className="mx-auto mb-3 h-[4px] w-10 rounded-full"
+              style={{ background: "rgba(28,28,28,0.15)" }}
+            />
+
+            {/* Header: chip + eyebrow + issuer + fav + ring */}
+            <div className="mb-4 flex items-center gap-3">
+              <div
+                className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[13px]"
+                style={{
+                  background: showLogo ? "#fff" : chipBg,
+                  color: chipFg,
+                  border: `1px solid ${BORDER}`,
+                  fontFamily: "'Sora', sans-serif",
+                  fontWeight: 600,
+                  fontSize: 13,
+                }}
+              >
+                {showLogo ? (
+                  <img src={logoUrl!} alt="" className="h-full w-full object-contain" />
+                ) : (
+                  initials(seed)
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div
+                  className="text-[9.5px] uppercase"
+                  style={{
+                    color: MUTED,
+                    fontFamily: "'JetBrains Mono', monospace",
+                    letterSpacing: "0.25em",
+                  }}
+                >
+                  Current code
+                </div>
+                <div
+                  className="truncate text-[17px]"
+                  style={{
+                    fontFamily: "'Playfair Display', serif",
+                    fontWeight: 600,
+                    letterSpacing: "-0.01em",
+                    color: CHARCOAL,
+                  }}
+                >
+                  {account.issuer || "Untitled"}
+                </div>
+                {account.label && (
+                  <div className="truncate text-[11.5px]" style={{ color: MUTED }}>
+                    {account.label}
+                  </div>
+                )}
+              </div>
+              {onToggleFavorite && (
+                <motion.span
+                  role="button"
+                  tabIndex={0}
+                  aria-label={isFavorite ? "Unpin favorite" : "Pin as favorite"}
+                  whileTap={{ scale: 0.85 }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleFavorite(account.id);
+                  }}
+                  className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full"
+                  style={{
+                    color: isFavorite ? FAV : MUTED,
+                    background: isFavorite ? "rgba(201,154,43,0.12)" : "transparent",
+                  }}
+                >
+                  <Star className="h-4 w-4" strokeWidth={1.9} fill={isFavorite ? FAV : "none"} />
+                </motion.span>
+              )}
+              <RingTimer progress={progress} remaining={remaining} warn={warn} />
+            </div>
+
+            {/* Code display (revealed or dotted) */}
+            <div
+              className="mb-2 flex flex-col items-center gap-1.5 rounded-[16px] py-5"
+              style={{
+                background: "#fff",
+                border: `1px solid ${BORDER}`,
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.6)",
+              }}
+            >
+              {revealed ? (
+                <AnimatePresence mode="popLayout" initial={false}>
+                  <motion.div
+                    key={`shown-${code}`}
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.18 }}
+                    className="text-[32px] leading-none tabular-nums"
+                    style={{
+                      color: warn ? DANGER : CHARCOAL,
+                      fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                      fontFeatureSettings: "'tnum'",
+                      fontWeight: 600,
+                      letterSpacing: "0.08em",
+                    }}
+                  >
+                    {formatCode(code)}
+                  </motion.div>
+                </AnimatePresence>
+              ) : (
+                <div className="flex items-center gap-2" style={{ color: MUTED }}>
+                  <EyeOff className="h-4 w-4" strokeWidth={1.7} />
+                  <span
+                    className="text-[22px] tabular-nums"
+                    style={{ letterSpacing: "0.32em", fontWeight: 600 }}
+                    aria-label="Code hidden"
+                  >
+                    • • •&nbsp;&nbsp;• • •
+                  </span>
+                </div>
+              )}
+              <div
+                className="flex items-center gap-1.5 text-[11px]"
+                style={{ color: warn ? DANGER : MUTED }}
+              >
+                <Clock3 className="h-3 w-3" strokeWidth={1.8} />
+                <span>Refreshes in {remaining}s</span>
+              </div>
+            </div>
+
+            {/* Copy primary */}
+            <motion.button
+              whileTap={{ scale: 0.99 }}
+              onClick={copyFromSheet}
+              className="mb-3 flex w-full items-center justify-center gap-2 rounded-[14px] px-4 py-3.5 text-[14px]"
+              style={{
+                background: CHARCOAL,
+                color: CREAM_SOFT,
+                fontWeight: 600,
+                letterSpacing: "-0.005em",
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.12)",
+              }}
+            >
+              {copied ? (
+                <>
+                  <Check className="h-4 w-4" strokeWidth={2.2} />
+                  Copied
+                </>
+              ) : (
+                <>
+                  <Copy className="h-4 w-4" strokeWidth={1.9} />
+                  Copy code
+                </>
+              )}
+            </motion.button>
+
+            {/* Next code preview */}
+            <div
+              className="mb-3 flex items-center gap-3 rounded-[14px] px-4 py-3"
+              style={{
+                background: "#fff",
+                border: `1px solid ${BORDER}`,
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.6)",
+              }}
+            >
+              <Clock3 className="h-4 w-4 shrink-0" strokeWidth={1.7} style={{ color: MUTED }} />
+              <div className="flex flex-1 flex-col leading-tight">
+                <span className="text-[13px]" style={{ color: CHARCOAL, fontWeight: 600 }}>
+                  Next code
+                </span>
+                <span className="text-[11px]" style={{ color: MUTED }}>
+                  Auto-generated
+                </span>
+              </div>
+              <span
+                className="tabular-nums text-[13px]"
+                style={{
+                  color: revealed || warn ? CHARCOAL : MUTED,
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontFeatureSettings: "'tnum'",
+                  letterSpacing: "0.12em",
+                  fontWeight: 600,
+                }}
+              >
+                {revealed && nextCode
+                  ? formatCode(nextCode)
+                  : "• • •  • • •"}
+              </span>
+            </div>
+
+            {/* Meta trio */}
+            <div className="mb-3 grid grid-cols-3 gap-2">
+              <MetaCell label="Algorithm" value={account.algorithm} />
+              <MetaCell label="Digits" value={String(account.digits)} />
+              <MetaCell label="Period" value={`${account.period}s`} />
+            </div>
+
+            {/* Storage note */}
+            <div
+              className="mb-4 flex items-start gap-3 rounded-[14px] px-4 py-3"
+              style={{
+                background: "rgba(28,28,28,0.03)",
+                border: `1px solid ${BORDER}`,
+              }}
+            >
+              <ShieldCheck
+                className="mt-0.5 h-4 w-4 shrink-0"
+                strokeWidth={1.7}
+                style={{ color: CHARCOAL }}
+              />
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[12.5px]" style={{ color: CHARCOAL, fontWeight: 600 }}>
+                  Stored on this device
+                </span>
+                <span className="text-[11.5px]" style={{ color: MUTED, lineHeight: 1.5 }}>
+                  Secret stays inside your encrypted vault. Use Security → Export for a portable backup.
+                </span>
+              </div>
+            </div>
+
+            {/* Action row: Reveal + Remove */}
+            <div className="grid grid-cols-2 gap-2 pb-1">
+              <motion.button
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setRevealed((v) => !v)}
+                className="flex items-center justify-center gap-2 rounded-[14px] px-3 py-3 text-[13px]"
+                style={{
+                  background: "#fff",
+                  color: CHARCOAL,
+                  border: `1px solid ${BORDER}`,
+                  fontWeight: 600,
+                  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.6)",
+                }}
+              >
+                {revealed ? (
+                  <>
+                    <EyeOff className="h-4 w-4" strokeWidth={1.8} />
+                    Hide
+                  </>
+                ) : (
+                  <>
+                    <Eye className="h-4 w-4" strokeWidth={1.8} />
+                    Reveal
+                  </>
+                )}
+              </motion.button>
+              <motion.button
+                whileTap={{ scale: 0.98 }}
+                onClick={openDelete}
+                disabled={!onDelete}
+                className="flex items-center justify-center gap-2 rounded-[14px] px-3 py-3 text-[13px] disabled:opacity-50"
+                style={{
+                  background: "rgba(178,58,42,0.06)",
+                  color: DANGER,
+                  border: `1px solid rgba(178,58,42,0.25)`,
+                  fontWeight: 600,
+                }}
+              >
+                <Trash2 className="h-4 w-4" strokeWidth={1.9} />
+                Remove
+              </motion.button>
+            </div>
+
+            {/* Close */}
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={() => setDetailsOpen(false)}
+              className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full"
+              style={{ background: "rgba(28,28,28,0.06)", color: CHARCOAL }}
+              aria-label="Close"
+            >
+              <X className="h-4 w-4" strokeWidth={1.8} />
+            </motion.button>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
     <AnimatePresence>
       {confirmOpen && (
         <motion.div
@@ -534,6 +868,42 @@ function RingTimer({ progress, remaining, warn }: { progress: number; remaining:
         }}
       >
         {remaining}
+      </span>
+    </div>
+  );
+}
+
+function MetaCell({ label, value }: { label: string; value: string }) {
+  return (
+    <div
+      className="flex flex-col items-center gap-1 rounded-[12px] px-2 py-2.5"
+      style={{
+        background: "#fff",
+        border: `1px solid ${BORDER}`,
+        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.6)",
+      }}
+    >
+      <span
+        className="text-[9.5px] uppercase"
+        style={{
+          color: MUTED,
+          fontFamily: "'JetBrains Mono', monospace",
+          letterSpacing: "0.22em",
+        }}
+      >
+        {label}
+      </span>
+      <span
+        className="text-[13.5px] tabular-nums"
+        style={{
+          color: CHARCOAL,
+          fontFamily: "'JetBrains Mono', monospace",
+          fontFeatureSettings: "'tnum'",
+          fontWeight: 600,
+          letterSpacing: "0.02em",
+        }}
+      >
+        {value}
       </span>
     </div>
   );
