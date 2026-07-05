@@ -138,6 +138,8 @@ function useModalA11y(
     };
   }, [open, onClose, panelRef]);
 }
+
+interface Props {
   account: DecryptedAccount;
   now: number;
   isFavorite?: boolean;
