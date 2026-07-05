@@ -67,9 +67,10 @@ Current shape:
 
 Ordered by user value on top of the current vault:
 
-1. **Search + favorites** on the Vault tab — sticky search input, star
-   icon on each `AccountCard`, favorites pinned above the rest. Pure
-   client-side (accounts already in memory once decrypted).
+1. ~~**Search + favorites** on the Vault tab~~ — DONE. Sticky search input
+   already shipped; favorites now use `src/lib/favorites.ts` (localStorage
+   per user id), star toggle on each `AccountCard`, and Vault renders two
+   groups: "Favorites" pinned above "All accounts".
 2. **Recovery sheet** — printable PDF (issuer names + wrapped recovery
    key as QR) generated in-browser at vault creation time. Backs up the
    "if you forget this passphrase, your codes cannot be recovered" line
