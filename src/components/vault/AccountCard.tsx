@@ -105,6 +105,18 @@ export function AccountCard({ account, now, isFavorite, onToggleFavorite, onDele
     }
   }, [account, now]);
 
+  // Peek at the next code in the last few seconds so the user can wait
+  // for a fresh one instead of copying a code about to expire.
+  const showNext = remaining <= 5;
+  const nextCode = useMemo(() => {
+    if (!showNext) return "";
+    try {
+      return generateCode(account, now + period * 1000);
+    } catch {
+      return "";
+    }
+  }, [account, now, period, showNext]);
+
   useEffect(() => {
     if (!copied) return;
     const t = setTimeout(() => setCopied(false), 1200);
@@ -117,7 +129,9 @@ export function AccountCard({ account, now, isFavorite, onToggleFavorite, onDele
       return;
     }
     try {
-      await navigator.clipboard.writeText(code.replace(/\s/g, ""));
+      const plain = code.replace(/\s/g, "");
+      await navigator.clipboard.writeText(plain);
+      scheduleClipboardClear(plain);
       setCopied(true);
       if (typeof navigator.vibrate === "function") navigator.vibrate(6);
     } catch {
