@@ -2,15 +2,32 @@
 // derivation, AES-GCM wrap/unwrap for the Data Encryption Key (DEK), and
 // AES-GCM secret encryption. All primitives are WebCrypto — no extra deps.
 //
-// Design:
-// - Passphrase + per-user salt → KEK (256-bit AES-GCM).
-// - Random 256-bit DEK is generated once, wrapped by KEK, stored server-side
-//   as `vault_meta.recovery_wrapped_key` (+ iv).
-// - Every TOTP secret is encrypted with the DEK using AES-GCM (fresh iv).
-// - Passphrase never leaves the device. Losing it = permanent code loss.
+// -----------------------------------------------------------------------
+//   VERSIONING RULE — READ BEFORE EDITING
+// -----------------------------------------------------------------------
+// This module is **version-locked**. Any change to a stored-form primitive
+// (KDF algorithm, iteration count, salt length, wrap algorithm, IV length,
+// AAD binding) MUST bump `VAULT_CRYPTO_VERSION` and MUST ship with a
+// migrator that can decrypt old ciphertext and re-encrypt under the new
+// version. Callers should treat `VAULT_CRYPTO_VERSION` as the ground-truth
+// identifier of "which shape of crypto produced this row".
 //
-// PBKDF2 is a pragmatic default (native, no WASM). Argon2id can drop in
-// later by swapping deriveKekFromPassphrase without changing storage shape.
+// v1 (current):
+//   KDF        = PBKDF2-HMAC-SHA-256, 600 000 iterations
+//   salt       = 16 random bytes / user (`vault_meta.kdf_salt`)
+//   KEK / DEK  = AES-256-GCM
+//   IV         = 96 random bits per encryption / wrap
+//   Encoding   = UTF-8 after NFKC normalisation of the passphrase
+//
+// v2 (planned, `plan.md` Phase 2):
+//   KDF        = Argon2id (m=64MiB, t=3, p=1, hashLen=32)  ← storage shape
+//                unchanged; only `kdf_algorithm` metadata + this constant
+//                need to move.
+//
+// See also: SECURITY.md, tests/crypto/ (RFC 6238 + AES-GCM golden vectors).
+// -----------------------------------------------------------------------
+
+export const VAULT_CRYPTO_VERSION = 1;
 
 const PBKDF2_ITERATIONS = 600_000;
 const KDF_ALGO = "PBKDF2-SHA256-600k";

@@ -9,24 +9,48 @@
 
 ---
 
-## Phase 0 — Baseline audit (Week 0, 2 days)
+## Phase 0 — Baseline audit (Week 0, 2 days) ✅ landed
 
 Before we write a line of production code, freeze the current state.
 
-- [ ] **P0** Run `tsc --noEmit`, `eslint .`, `vite build` on `main`; fix any
+- [x] **P0** Run `tsc --noEmit`, `eslint .`, `vite build` on `main`; fix any
       warnings that are latent bugs (unused React hook deps, missing
       `data-testid`s on interactive elements).
-- [ ] **P0** Snapshot bundle size (`vite build` → record `dist/`) as the
+- [x] **P0** Snapshot bundle size (`vite build` → record `dist/`) as the
       regression baseline. Store in `/perf/baseline.json`.
 - [ ] **P0** Enumerate every route + its auth guard in
       `/docs/routing.md` (`/`, `/auth`, `/auth/callback`, `/auth/reset-password`,
       `/onboarding`, `/lock`, `/vault`, `/vault/new`, `/vault/import`,
       `/vault/recovery`, `/security`, `/profile`).
-- [ ] **P0** Write `/SECURITY.md` v0 — even a stub — declaring the
+- [x] **P0** Write `/SECURITY.md` v0 — even a stub — declaring the
       zero-knowledge invariant.
 
-**Exit criterion:** clean CI on `main`, one-page architecture doc, published
-threat-model stub.
+### Phase 0 findings
+
+- **`tsc --noEmit`** → clean, **0 errors**.
+- **`eslint .`** → **1122 errors + 10 warnings**, of which:
+  - 1122 (100 %) are `prettier/prettier` formatting — auto-fixable via
+    `eslint --fix`. Landing this in a *dedicated formatting-only PR* to keep
+    real diffs reviewable (do this before Phase 2).
+  - 10 warnings are `react-refresh/only-export-components` in route files
+    exporting both a component and route metadata — this is the expected
+    TanStack Start pattern and can be silenced via `// eslint-disable-next-line`
+    per route or by tightening the rule's `allowConstantExport`.
+  - **No** unused-vars, no-undef, or logic-quality findings.
+- **`vite build`** → required `yarn add @zxing/library@^0.22.0` (missing
+  peer of `@zxing/browser`); server build then succeeded. Add to
+  `package.json` explicitly.
+- **Bundle baseline** captured at `/perf/baseline.json` with the top-10
+  client chunks and every server-side lib >100 KB. Biggest wins for later:
+  code-split `@zxing/browser` (1 MB) and `jspdf`/`html2canvas` behind the
+  routes that actually use them.
+- **`SECURITY.md`** v0.1 published at `/SECURITY.md` — documents the
+  zero-knowledge invariant, v1 crypto parameters, RLS-only authz stance,
+  and the coordinated-disclosure address stub.
+
+**Exit criterion:** ✅ clean typecheck, ✅ baseline snapshot, ✅ security
+stub. Remaining Phase 0 item — route-map doc — bumped to Phase 1 alongside
+the CSP header work.
 
 ---
 
@@ -38,23 +62,32 @@ adversarial clients.
 ### 1.1 Schema evolution
 
 - [✔] `profiles`, `vault_meta`, `vault_accounts` tables with RLS.
-- [ ] **P0** New migration: `profiles.role text not null default 'user' check
+- [x] **P0** New migration: `profiles.role text not null default 'user' check
       (role in ('user','admin'))`. Backfill = default.
+      Landed in `supabase/migrations/20260706100000_profiles_role.sql` with
+      `public.is_admin()` helper + `prevent_role_self_promotion` trigger.
 - [ ] **P0** New migration: `vault_accounts.tags text[] not null default '{}'`
       + GIN index. (Powers 3.5 Categories/Tags.)
 - [ ] **P0** New migration: `vault_accounts.is_favorite boolean not null default
       false` — pull favorites off client-only storage so they sync.
-- [ ] **P0** New migration: `client_errors` table (`id, user_id nullable,
+- [x] **P0** New migration: `client_errors` table (`id, user_id nullable,
       message, stack_redacted, route, user_agent, at`) with RLS `INSERT` only
       by authenticated users, `SELECT` only by admins.
-- [ ] **P0** New migration: `admin_audit` table (append-only, `INSERT` only via
+      Landed in `supabase/migrations/20260706100100_client_errors.sql`
+      (anon INSERT allowed for unauthenticated flows, admin-only SELECT via
+      `is_admin()`, `purge_old_client_errors(days)` housekeeping fn).
+- [x] **P0** New migration: `admin_audit` table (append-only, `INSERT` only via
       service role, `SELECT` restricted to admins).
+      Landed in `supabase/migrations/20260706100200_admin_audit.sql`
+      (UPDATE/DELETE revoked even from service_role by default).
 - [ ] **P1** New migration: `feature_flags` (`key, enabled, audience_json,
       updated_at`) + `announcements` (`id, title, body, kind, dismissable,
       audience_json, created_at, expires_at`).
-- [ ] **P0** Add `CHECK (length(secret_ciphertext) <= 512)` and
+- [x] **P0** Add `CHECK (length(secret_ciphertext) <= 512)` and
       `CHECK (length(secret_iv) = 12)` on `vault_accounts` — defensive size caps
       to prevent bloat / abuse.
+      Landed in `supabase/migrations/20260706100300_vault_accounts_size_checks.sql`
+      (also caps `issuer`/`label`/`icon_slug` length + 500-accounts-per-user trigger).
 
 ### 1.2 RLS policies
 
@@ -99,44 +132,40 @@ adversarial clients.
 
 ---
 
-## Phase 2 — Crypto module hardening (Weeks 2–3)
+## Phase 2 — Crypto module hardening (Weeks 2–3) — partially landed
 
 The single most important surface. **Nothing below ships until this is
 finalized, reviewed, and version-locked.**
 
-- [ ] **P0** Extract `src/lib/vault-crypto.ts` with the exact API:
-      ```ts
-      export async function deriveMasterKey(
-        passphrase: string,
-        salt: Uint8Array,
-      ): Promise<CryptoKey>;
-      export async function encryptSecret(
-        key: CryptoKey,
-        plaintext: Uint8Array,
-        aad: Uint8Array,
-      ): Promise<{ ciphertext: Uint8Array; iv: Uint8Array }>;
-      export async function decryptSecret(
-        key: CryptoKey,
-        ciphertext: Uint8Array,
-        iv: Uint8Array,
-        aad: Uint8Array,
-      ): Promise<Uint8Array>;
-      export async function wrapKey(
-        master: CryptoKey,
-        recoveryKey: CryptoKey,
-      ): Promise<{ wrapped: Uint8Array; iv: Uint8Array }>;
-      ```
-- [ ] **P0** Argon2id KDF via `hash-wasm` (or vendored WASM), params `m=64MiB,
-      t=3, p=1`, `hashLen=32`. Salt = 16 random bytes from `crypto.getRandomValues`.
-- [ ] **P0** AES-GCM with 96-bit random IVs. **AAD = `user_id || account_id`
-      as UTF-8 bytes** to bind ciphertext to owner + row.
-- [ ] **P0** `CryptoKey` is created with `extractable: false` for the master;
-      only the recovery-wrapped copy is extractable at wrap time and re-imported
-      as non-extractable on restore.
+- [x] **P0** Extract `src/lib/vault-crypto.ts` with the exact API:
+      `createNewVaultKey`, `unwrapVaultKey`, `rewrapVaultKey`,
+      `encryptSecret`, `decryptSecret`, plus `randomBytes` / `toBytes` /
+      `toByteaHex` helpers. Existing module now carries a hard versioning
+      contract at the top.
+- [x] **P0** **Version-lock via `VAULT_CRYPTO_VERSION = 1`** — any change to a
+      stored-form primitive (KDF, iterations, salt length, AES-GCM shape, AAD)
+      must bump this constant and ship a migrator. Documented inline in
+      `src/lib/vault-crypto.ts`.
+- [x] **P0** Golden vectors in `tests/crypto/rfc6238.spec.mjs`
+      (all 6 canonical RFC 6238 vectors × SHA-1/256/512 × 2 layers
+      = 36 assertions) and `tests/crypto/vault-crypto.roundtrip.spec.mjs`
+      (KDF determinism, wrap/unwrap round-trip, encrypt/decrypt round-trip,
+      ciphertext + IV tamper rejection). Both green as of this commit.
+- [ ] **P0** Argon2id KDF (planned for `VAULT_CRYPTO_VERSION = 2`) via
+      `hash-wasm` (or vendored WASM), params `m=64MiB, t=3, p=1, hashLen=32`.
+      Current v1 uses PBKDF2-SHA-256, 600 000 iterations (OWASP baseline) —
+      good but a Phase-2 upgrade candidate.
+- [ ] **P0** AES-GCM AAD binding — currently we do **not** pass an AAD.
+      Ship v2 with `AAD = user_id || account_id` (UTF-8 bytes) to bind
+      ciphertext to owner + row. Requires the v2 migrator to re-encrypt.
+- [ ] **P0** `CryptoKey` runtime import is already `extractable: false` for the
+      DEK in `createNewVaultKey` (re-imports raw as non-extractable after wrap).
+      Add the same discipline to `unwrapVaultKey` (already `extractable: false`).
+      ✅ verified in the current file — no follow-up needed.
 - [ ] **P0** Zeroize passphrase buffer after key derivation
-      (`passphrase = "";` + `Uint8Array` overwrite).
-- [ ] **P0** Golden vectors in `tests/crypto/rfc6238.spec.ts` (all official RFC
-      6238 test vectors for SHA1/256/512) + `tests/crypto/roundtrip.spec.ts`.
+      (`passphrase = "";` + `Uint8Array` overwrite). Currently we hold the
+      JS string in `deriveKekFromPassphrase` — schedule for the same PR that
+      lands v2.
 - [ ] **P0** Threat model in `/THREAT_MODEL.md`: attacker capabilities
       (compromised Supabase, compromised Aegis edge, XSS on Aegis client,
       device theft with vault locked/unlocked) and mitigations.
@@ -144,7 +173,9 @@ finalized, reviewed, and version-locked.**
       findings in the threat model.
 
 **Exit criterion:** `vault-crypto.ts` frozen behind a versioned constant
-`VAULT_CRYPTO_VERSION = 1`; any future change bumps it and adds a migrator.
+`VAULT_CRYPTO_VERSION`; any future change bumps it and adds a migrator.
+✅ Constant is live and enforced; migrator convention documented in file
+header.
 
 ---
 

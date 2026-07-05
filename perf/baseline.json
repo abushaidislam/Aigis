@@ -1,0 +1,74 @@
+{
+  "$schema": "./baseline.schema.json",
+  "recorded_at": "2026-01",
+  "vault_crypto_version": 1,
+  "node": "20.20.2",
+  "vite": "^8.0.16",
+  "tanstack_start": "^1.168.26",
+  "commands": {
+    "typecheck": "./node_modules/.bin/tsc --noEmit",
+    "lint": "./node_modules/.bin/eslint .",
+    "build": "./node_modules/.bin/vite build"
+  },
+  "results": {
+    "typecheck": {
+      "status": "pass",
+      "errors": 0
+    },
+    "lint": {
+      "status": "warn",
+      "errors": 1122,
+      "warnings": 10,
+      "notes": [
+        "1122/1132 findings are prettier/prettier formatting only — auto-fixable with `eslint --fix` in a dedicated formatting PR.",
+        "10 warnings are react-refresh/only-export-components (route files exporting both a component and route metadata — expected pattern for TanStack Start).",
+        "Zero real TS or logic issues detected."
+      ],
+      "rule_breakdown": {
+        "prettier/prettier": 1122,
+        "react-refresh/only-export-components": 10
+      }
+    },
+    "build": {
+      "status": "pass",
+      "notes": [
+        "Required adding @zxing/library@^0.22.0 as a peer of @zxing/browser — track in plan.md Phase 0 as a P0 dep-hygiene fix."
+      ]
+    }
+  },
+  "bundle_client_top_10_bytes": [
+    { "file": "esm-fEXCFyGa.js",              "bytes": 468429 },
+    { "file": "index-BfcwBV5N.js",            "bytes": 460959 },
+    { "file": "vault_.recovery-B-h5QYVx.js",  "bytes": 429568 },
+    { "file": "client-DddsDDfk.js",           "bytes": 204598 },
+    { "file": "html2canvas-CNjex5NH.js",      "bytes": 199577 },
+    { "file": "index.es-whhSTvCS.js",         "bytes": 151390 },
+    { "file": "shield-D9ZyguMh.js",           "bytes": 121441 },
+    { "file": "styles-CJZeTcMc.css",          "bytes": 83200 },
+    { "file": "security--O-e7JDV.js",         "bytes": 49210 },
+    { "file": "purify.es-ZPrpXrUc.js",        "bytes": 26127 }
+  ],
+  "totals": {
+    "output_public_bytes_du": "2.6M",
+    "output_server_bytes_du": "5.3M"
+  },
+  "heavy_deps_in_server_bundle_gt_100kb": [
+    { "lib": "@zxing/browser",            "bytes": 1068490 },
+    { "lib": "@tanstack/react-router",    "bytes": 656820 },
+    { "lib": "jspdf",                     "bytes": 476760 },
+    { "lib": "framer-motion",             "bytes": 352120 },
+    { "lib": "canvg",                     "bytes": 330640 },
+    { "lib": "html2canvas",               "bytes": 318370 },
+    { "lib": "@supabase/auth-js+tslib",   "bytes": 301840 },
+    { "lib": "fast-png+iobuffer+pako",    "bytes": 143230 },
+    { "lib": "@supabase/storage-js",      "bytes": 118930 },
+    { "lib": "@supabase/postgrest-js",    "bytes": 105410 }
+  ],
+  "follow_ups_from_baseline": [
+    "P1 · Code-split @zxing/browser + jspdf so they load only on /vault/new + /vault/recovery (biggest single wins).",
+    "P1 · Investigate why html2canvas is bundled — likely dragged in by jspdf. Check if we can avoid it in the recovery PDF path.",
+    "P0 · Land the prettier auto-fix in a dedicated formatting-only PR before Phase 2 work begins.",
+    "P0 · Add @zxing/library to package.json (dep, not peer) so CI stays green.",
+    "P0 · Add `size-limit` (or a simple CI grep on this baseline file) so regressions above 460KB/index chunk fail CI."
+  ]
+}
