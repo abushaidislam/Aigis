@@ -64,9 +64,13 @@ function hueFor(seed: string): number {
   return h % 360;
 }
 
-export function AccountCard({ account, now, isFavorite, onToggleFavorite }: Props) {
+export function AccountCard({ account, now, isFavorite, onToggleFavorite, onDelete }: Props) {
   const [copied, setCopied] = useState(false);
   const [logoFailed, setLogoFailed] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const pressTimer = useRef<number | null>(null);
+  const longPressedRef = useRef(false);
 
   const period = account.period;
   const elapsed = Math.floor(now / 1000) % period;
@@ -88,12 +92,48 @@ export function AccountCard({ account, now, isFavorite, onToggleFavorite }: Prop
   }, [copied]);
 
   const copy = async () => {
+    if (longPressedRef.current) {
+      longPressedRef.current = false;
+      return;
+    }
     try {
       await navigator.clipboard.writeText(code.replace(/\s/g, ""));
       setCopied(true);
       if (typeof navigator.vibrate === "function") navigator.vibrate(6);
     } catch {
       /* ignore */
+    }
+  };
+
+  const clearPress = () => {
+    if (pressTimer.current !== null) {
+      window.clearTimeout(pressTimer.current);
+      pressTimer.current = null;
+    }
+  };
+
+  const startPress = () => {
+    if (!onDelete) return;
+    clearPress();
+    longPressedRef.current = false;
+    pressTimer.current = window.setTimeout(() => {
+      longPressedRef.current = true;
+      if (typeof navigator.vibrate === "function") navigator.vibrate(14);
+      setConfirmOpen(true);
+    }, 500);
+  };
+
+  const confirmDelete = async () => {
+    if (!onDelete) return;
+    setDeleting(true);
+    try {
+      await onDelete(account.id);
+      toast.success(`Removed ${account.issuer || "account"}`);
+      setConfirmOpen(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not delete account.");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -114,8 +154,19 @@ export function AccountCard({ account, now, isFavorite, onToggleFavorite }: Prop
   }, [account.issuer, logoUrl]);
 
   return (
+    <>
     <motion.button
       onClick={copy}
+      onPointerDown={startPress}
+      onPointerUp={clearPress}
+      onPointerLeave={clearPress}
+      onPointerCancel={clearPress}
+      onContextMenu={(e) => {
+        if (!onDelete) return;
+        e.preventDefault();
+        longPressedRef.current = true;
+        setConfirmOpen(true);
+      }}
       whileTap={{ scale: 0.99, backgroundColor: "rgba(28,28,28,0.03)" }}
       className="group relative flex w-full flex-col gap-2 px-4 py-3 text-left"
       style={{ background: "transparent" }}
