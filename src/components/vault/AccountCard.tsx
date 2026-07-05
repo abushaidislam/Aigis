@@ -321,6 +321,26 @@ export function AccountCard({ account, now, isFavorite, onToggleFavorite, onDele
               <Check className="h-3 w-3" strokeWidth={2.4} />
               Copied
             </motion.div>
+          ) : showNext && nextCode ? (
+            <motion.div
+              key="next"
+              initial={{ opacity: 0, y: 2 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18 }}
+              className="flex items-baseline gap-1.5 tabular-nums"
+              style={{
+                color: MUTED,
+                fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                fontFeatureSettings: "'tnum'",
+                fontSize: 11,
+                letterSpacing: "0.05em",
+              }}
+              aria-label={`Next code ${nextCode}`}
+            >
+              <span style={{ opacity: 0.7 }}>next</span>
+              <span style={{ color: CHARCOAL, fontWeight: 600 }}>{formatCode(nextCode)}</span>
+            </motion.div>
           ) : (
             <motion.div
               key="copy"
