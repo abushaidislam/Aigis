@@ -2,6 +2,8 @@ import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+import { withSecurityHeaders } from "./lib/security-headers.server";
+import { serverLog, routeOf } from "./lib/server-log.server";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -28,7 +30,11 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
   const body = await response.clone().text();
   if (!isH3SwallowedErrorBody(body)) return response;
 
-  console.error(consumeLastCapturedError() ?? new Error(`h3 swallowed SSR error: ${body}`));
+  const captured = consumeLastCapturedError();
+  serverLog.error(
+    "ssr.h3_swallowed_error",
+    captured instanceof Error ? captured : new Error(`h3 swallowed SSR error: ${body}`),
+  );
   return new Response(renderErrorPage(), {
     status: 500,
     headers: { "content-type": "text/html; charset=utf-8" },
@@ -46,16 +52,32 @@ function isH3SwallowedErrorBody(body: string): boolean {
 
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
+    const started = Date.now();
+    const route = routeOf(request);
     try {
       const handler = await getServerEntry();
-      const response = await handler.fetch(request, env, ctx);
-      return await normalizeCatastrophicSsrResponse(response);
+      const raw = await handler.fetch(request, env, ctx);
+      const normalized = await normalizeCatastrophicSsrResponse(raw);
+      const finalResponse = withSecurityHeaders(normalized);
+      if (normalized.status >= 500) {
+        serverLog.warn("ssr.response_5xx", {
+          route,
+          duration_ms: Date.now() - started,
+          extra: { status: normalized.status },
+        });
+      }
+      return finalResponse;
     } catch (error) {
-      console.error(error);
-      return new Response(renderErrorPage(), {
-        status: 500,
-        headers: { "content-type": "text/html; charset=utf-8" },
+      serverLog.error("ssr.uncaught_edge_error", error, {
+        route,
+        duration_ms: Date.now() - started,
       });
+      return withSecurityHeaders(
+        new Response(renderErrorPage(), {
+          status: 500,
+          headers: { "content-type": "text/html; charset=utf-8" },
+        }),
+      );
     }
   },
 };

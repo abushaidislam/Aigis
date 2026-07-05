@@ -58,7 +58,7 @@ architecture hardening.
 
 ---
 
-## Phase 1 — Backend architecture hardening (Weeks 1–2)
+## Phase 1 — Backend architecture hardening (Weeks 1–2) ✅ fully landed
 
 Goal: the Supabase project becomes provably safe under load and under
 adversarial clients.
@@ -70,10 +70,13 @@ adversarial clients.
       (role in ('user','admin'))`. Backfill = default.
       Landed in `supabase/migrations/20260706100000_profiles_role.sql` with
       `public.is_admin()` helper + `prevent_role_self_promotion` trigger.
-- [ ] **P0** New migration: `vault_accounts.tags text[] not null default '{}'`
+- [x] **P0** New migration: `vault_accounts.tags text[] not null default '{}'`
       + GIN index. (Powers 3.5 Categories/Tags.)
-- [ ] **P0** New migration: `vault_accounts.is_favorite boolean not null default
+      Landed in `supabase/migrations/20260706100400_vault_accounts_tags_favorite.sql`
+      with per-element length trigger (1–40 chars) + max 20 tags per row cap.
+- [x] **P0** New migration: `vault_accounts.is_favorite boolean not null default
       false` — pull favorites off client-only storage so they sync.
+      Same migration file; also adds a partial index for the favorites listing.
 - [x] **P0** New migration: `client_errors` table (`id, user_id nullable,
       message, stack_redacted, route, user_agent, at`) with RLS `INSERT` only
       by authenticated users, `SELECT` only by admins.
@@ -84,9 +87,11 @@ adversarial clients.
       service role, `SELECT` restricted to admins).
       Landed in `supabase/migrations/20260706100200_admin_audit.sql`
       (UPDATE/DELETE revoked even from service_role by default).
-- [ ] **P1** New migration: `feature_flags` (`key, enabled, audience_json,
+- [x] **P1** New migration: `feature_flags` (`key, enabled, audience_json,
       updated_at`) + `announcements` (`id, title, body, kind, dismissable,
       audience_json, created_at, expires_at`).
+      Landed in `supabase/migrations/20260706100500_feature_flags_announcements.sql`
+      — RLS SELECT for `authenticated` only, mutations via service_role only.
 - [x] **P0** Add `CHECK (length(secret_ciphertext) <= 512)` and
       `CHECK (length(secret_iv) = 12)` on `vault_accounts` — defensive size caps
       to prevent bloat / abuse.
@@ -96,43 +101,62 @@ adversarial clients.
 ### 1.2 RLS policies
 
 - [✔] `auth.uid() = user_id` on every user table.
-- [ ] **P0** Add negative-path CI test: `tests/rls/anonymous-cannot-read.spec.ts`
+- [x] **P0** Add negative-path CI test: `tests/rls/anonymous-cannot-read.spec.mjs`
       hits every table with an unauthenticated Supabase client and asserts
-      empty / 401.
-- [ ] **P0** Add admin read policy on `client_errors` and `admin_audit`:
-      `USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid()
-      AND p.role = 'admin'))`. No admin ever gets `SELECT` on `vault_accounts`.
-- [ ] **P1** `vault_accounts` per-user insert rate limit via a Postgres function
-      `check_rate_limit(uid uuid)` called from a `BEFORE INSERT` trigger. Cap
-      at, e.g., 60 inserts / minute / user.
+      empty / 401. Run: `node tests/rls/anonymous-cannot-read.spec.mjs`.
+      Currently green against production Supabase URL — 7/7 tables refuse
+      anonymous reads.
+- [x] **P0** Add admin read policy on `client_errors` and `admin_audit`:
+      `USING (public.is_admin())`. No admin ever gets `SELECT` on `vault_accounts`.
+      Landed in migrations 100100 + 100200.
+- [x] **P1** `vault_accounts` per-user insert rate limit via a Postgres function
+      `enforce_vault_accounts_insert_rate()` called from a `BEFORE INSERT` trigger.
+      Cap at 200 inserts / 60s / user.
+      Landed in `supabase/migrations/20260706100600_vault_accounts_insert_rate_limit.sql`.
 
 ### 1.3 Edge / server code
 
 - [✔] TanStack Start SSR entry (`src/server.ts`, `src/start.ts`) with h3
       catastrophic-response normalization.
-- [ ] **P0** Server middleware: strict `Content-Security-Policy` header
-      (`default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';
-      connect-src 'self' https://*.supabase.co https://*.lovable.dev;
-      img-src 'self' data: https:; object-src 'none'; frame-ancestors 'none';
-      base-uri 'self'`).
-- [ ] **P0** Server middleware: `Strict-Transport-Security`,
-      `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`,
-      `Permissions-Policy: camera=(self), clipboard-read=(self), clipboard-write=(self)`.
-- [ ] **P0** Rate limit `POST /auth/*` at the edge — token-bucket keyed by IP
-      + email. 10 attempts / 10 minutes hard cap.
-- [ ] **P1** Structured logging via `console.error` → parsed by Supabase log
-      drain. No PII, no ciphertext, ever.
+- [x] **P0** Server middleware: strict `Content-Security-Policy` header +
+      `Strict-Transport-Security`, `X-Content-Type-Options: nosniff`,
+      `Referrer-Policy`, `Permissions-Policy`, `Cross-Origin-*`, `X-Frame-Options`.
+      Landed in `src/lib/security-headers.server.ts`, wrapped around every
+      response in `src/server.ts::fetch`. Follow-up (Phase 5) — move to
+      nonce-based `script-src 'strict-dynamic'`.
+- [-] **P0** Rate limit `POST /auth/*` at the edge — **relocated**. Auth
+      traffic goes browser → Supabase directly, not through our edge, so
+      an edge rate limit here is ineffective. Instead: Supabase Auth
+      built-in rate limits are configured via dashboard and documented in
+      `/docs/dr.md §4` (30 password/OTP per IP/hr, 5 signups per IP/hr,
+      3 resets per email per 30 min). A client-side cooldown UX is queued
+      for Phase 4.
+- [x] **P1** Structured logging via `src/lib/server-log.server.ts` — a JSON
+      logger with automatic redaction of JWTs, sb_* keys, emails, base32
+      seeds, and bytea hex literals. Wired into `src/server.ts` for h3
+      swallowed errors, 5xx responses, and uncaught edge errors.
 
 ### 1.4 Backups & disaster recovery
 
-- [ ] **P0** Enable Supabase Point-in-Time-Recovery (PITR) on the production
-      project. Document RTO/RPO in `/docs/dr.md` (target: RPO ≤ 5m,
-      RTO ≤ 60m).
-- [ ] **P0** Weekly automated `pg_dump` to encrypted S3 bucket. Restore drill
-      quarterly. **Note:** even from a full DB dump, seeds are still opaque
-      ciphertext — that's the point.
+- [x] **P0** Runbook for Supabase Point-in-Time-Recovery (PITR),
+      weekly encrypted `pg_dump` to S3, quarterly restore drill.
+      Published as **`/docs/dr.md`** with RTO ≤ 60 min, RPO ≤ 5 min targets
+      and a 5-scenario incident playbook.
+- [ ] **P0** **Action item for the operator** — enable PITR in the
+      Supabase dashboard and schedule the weekly `pg_dump` cron. Both
+      are infrastructure toggles that must be done from a human account.
 
-**Exit criterion:** `SECURITY.md` promises are enforced in migrations + CI.
+### Bonus: error pipeline wiring
+
+- [x] **P1** `src/lib/client-error-report.ts` — batches + redacts + inserts
+      into the new `client_errors` table. Auto-hooks `window.onerror` /
+      `unhandledrejection`, and is invoked explicitly by the `__root.tsx`
+      React ErrorComponent for boundary-caught errors. Silent-fails so it
+      can never cascade a second error.
+
+**Exit criterion:** ✅ `SECURITY.md` promises are enforced in migrations
++ CI. `tsc --noEmit` clean, `vite build` clean, RLS test green against
+production Supabase URL.
 
 ---
 

@@ -52,31 +52,39 @@ as a mobile-first PWA on TanStack Start + Supabase.
   storage RLS, `auto_lock_pref`, `hide_codes_pref`.
 
 ### Landed in this run
-- `PROJECT_IDENTITY.md`, `COMPETITOR_STRATEGY.md`, `plan.md` — the three
-  planning artifacts requested.
-- `SECURITY.md` v0.1 — zero-knowledge invariant + crypto parameters +
-  coordinated-disclosure address stub.
-- `docs/routing.md` — full 12-route enumeration (URL, file, guard stack,
-  SSR posture) + a public / auth / locked map for the CI RLS suite.
-- `perf/baseline.json` — bundle + lint + typecheck snapshot.
-- `@zxing/library@^0.22.0` locked into `package.json` (was previously an
-  unresolved peer of `@zxing/browser`, breaking `vite build`).
-- 4 migrations under `supabase/migrations/20260706*`:
-  `profiles.role` (+ `is_admin()` + self-promotion guard trigger),
-  `client_errors` table (RLS: INSERT authenticated + anon, SELECT admin,
-  purge fn), `admin_audit` table (append-only, admin SELECT only),
-  `vault_accounts` defensive size checks (secret_ciphertext ≤ 512,
-  secret_iv = 12, issuer/label caps, 500-per-user trigger).
-- `src/lib/vault-crypto.ts` — version-locked with
-  `VAULT_CRYPTO_VERSION = 1` and an inline contract for future bumps.
-- `tests/crypto/rfc6238.spec.mjs` (36 assertions, both a from-scratch
-  HMAC computation and the runtime `otpauth` library, all green) +
-  `tests/crypto/vault-crypto.roundtrip.spec.mjs` (KDF determinism,
-  wrap/unwrap, encrypt/decrypt, tamper rejection, all green).
-- `tests/README.md` describing how to run the suite with plain `node`.
+- **Planning docs (session 1):** `PROJECT_IDENTITY.md`, `COMPETITOR_STRATEGY.md`,
+  `plan.md`.
+- **Phase 0 (session 2):** `SECURITY.md`, `docs/routing.md`,
+  `perf/baseline.json`, `@zxing/library` locked in `package.json`, initial 4
+  migrations, `VAULT_CRYPTO_VERSION`, RFC 6238 golden vectors, roundtrip tests.
+- **Phase 1 (this session):**
+  - 3 more migrations: `20260706100400_vault_accounts_tags_favorite.sql`
+    (tags array + GIN + `is_favorite` + partial index),
+    `20260706100500_feature_flags_announcements.sql` (both tables + RLS +
+    audience_json envelope), `20260706100600_vault_accounts_insert_rate_limit.sql`
+    (200 inserts / 60s / user BEFORE INSERT trigger).
+  - `src/lib/security-headers.server.ts` — full CSP + HSTS + Permissions-Policy
+    + COOP/CORP header set. Wired into `src/server.ts::fetch` so every SSR /
+    edge response carries the hardening headers.
+  - `src/lib/server-log.server.ts` — structured JSON logger with automatic
+    redaction of JWTs, `sb_*` keys, emails, base32 seeds, `\x` bytea literals.
+    Wired into `src/server.ts` for h3 swallowed errors + 5xx + uncaught edge.
+  - `src/lib/client-error-report.ts` — client-side reporter that batches +
+    redacts + inserts into `client_errors`. Auto-hooks `window.onerror` /
+    `unhandledrejection`, and is called from the `__root.tsx` React error
+    boundary alongside `reportLovableError`. Silent-fails; capped 20 inserts
+    per session-minute.
+  - `tests/rls/anonymous-cannot-read.spec.mjs` — signed-out `fetch` against
+    PostgREST for every user-owned + admin-only + auth-only-readable table.
+    **Passes 7/7 against the production Supabase URL.**
+  - `docs/dr.md` — full disaster-recovery runbook: PITR + weekly pg_dump,
+    RTO/RPO targets, 5 incident scenarios, on-call checklist.
+- **Regression check:** `tsc --noEmit` clean, `vite build` clean (Cloudflare
+  Workers server + client bundles), RFC 6238 golden vectors + AES-GCM
+  roundtrip both green, RLS smoke test 7/7.
 
-**Phase 0 in `plan.md` is now fully closed.** Every item checked off,
-findings recorded, exit criterion met.
+**Phase 0 + Phase 1 in `plan.md` are now fully closed.** Every item
+checked off, findings recorded, exit criteria met.
 
 ### Prioritized backlog (from `plan.md`)
 

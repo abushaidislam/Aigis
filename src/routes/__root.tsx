@@ -11,6 +11,7 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { reportClientError } from "../lib/client-error-report";
 
 function NotFoundComponent() {
   return (
@@ -39,6 +40,12 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   const router = useRouter();
   useEffect(() => {
     reportLovableError(error, { boundary: "tanstack_root_error_component" });
+    void reportClientError({
+      message: error.message,
+      stack: error.stack,
+      route: typeof window !== "undefined" ? window.location.pathname : undefined,
+      extra: { source: "react_error_boundary" },
+    });
   }, [error]);
 
   return (
