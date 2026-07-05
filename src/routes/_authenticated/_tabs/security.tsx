@@ -12,7 +12,10 @@ import {
   Check,
   X,
   FileText,
+  EyeOff,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { setHideCodes, useHideCodes } from "@/lib/vault-privacy";
 import {
   BORDER,
   CHARCOAL,
