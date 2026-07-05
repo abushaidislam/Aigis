@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       profiles: {
         Row: {
+          auto_lock_pref: string | null
           avatar_url: string | null
           created_at: string
           display_name: string | null
@@ -24,6 +25,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          auto_lock_pref?: string | null
           avatar_url?: string | null
           created_at?: string
           display_name?: string | null
@@ -32,6 +34,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          auto_lock_pref?: string | null
           avatar_url?: string | null
           created_at?: string
           display_name?: string | null

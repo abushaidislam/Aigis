@@ -6,6 +6,7 @@
 // in localStorage). `null` means "never auto-lock".
 
 import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 export const AUTO_LOCK_OPTIONS: { label: string; value: number | null }[] = [
   { label: "After 1 minute", value: 60 * 1000 },
@@ -50,10 +51,45 @@ function loadAutoLock(userId: string): number | null {
   }
 }
 
+function encodePref(value: number | null): string {
+  return value === null ? "never" : String(value);
+}
+
+function decodePref(raw: string | null | undefined): number | null | undefined {
+  if (raw === null || raw === undefined) return undefined;
+  if (raw === "never") return null;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+}
+
 export function initAutoLockForUser(userId: string) {
   currentUserId = userId;
+  // Optimistic: read the cached value from localStorage right away so the UI
+  // never flashes the wrong choice during the round trip.
   autoLockMs = loadAutoLock(userId);
   emitSettings();
+
+  // Hydrate from the user's profile so the choice syncs across devices.
+  void supabase
+    .from("profiles")
+    .select("auto_lock_pref")
+    .eq("id", userId)
+    .maybeSingle()
+    .then(({ data }) => {
+      if (currentUserId !== userId) return;
+      const remote = decodePref(data?.auto_lock_pref);
+      if (remote === undefined) return;
+      if (remote === autoLockMs) return;
+      autoLockMs = remote;
+      // Keep the local cache in sync too.
+      try {
+        window.localStorage.setItem(storageKey(userId), encodePref(remote));
+      } catch {
+        // ignore
+      }
+      if (dek) scheduleAutoLock();
+      emitSettings();
+    });
 }
 
 export function getAutoLockMs(): number | null {
@@ -62,12 +98,10 @@ export function getAutoLockMs(): number | null {
 
 export function setAutoLockMs(value: number | null) {
   autoLockMs = value;
-  if (currentUserId && typeof window !== "undefined") {
+  const userId = currentUserId;
+  if (userId && typeof window !== "undefined") {
     try {
-      window.localStorage.setItem(
-        storageKey(currentUserId),
-        value === null ? "never" : String(value),
-      );
+      window.localStorage.setItem(storageKey(userId), encodePref(value));
     } catch {
       // ignore
     }
@@ -75,6 +109,14 @@ export function setAutoLockMs(value: number | null) {
   // Reschedule with the new value if vault is unlocked.
   if (dek) scheduleAutoLock();
   emitSettings();
+
+  // Persist to the user's profile so it follows them across devices.
+  if (userId) {
+    void supabase
+      .from("profiles")
+      .update({ auto_lock_pref: encodePref(value) })
+      .eq("id", userId);
+  }
 }
 
 function scheduleAutoLock() {
