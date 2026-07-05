@@ -234,6 +234,36 @@ function SecurityPage() {
           />
         </SettingsGroup>
 
+        <SectionLabel>Sign-in</SectionLabel>
+        <SettingsGroup>
+          <SettingsRow
+            icon={<Fingerprint className="h-4 w-4" strokeWidth={1.8} />}
+            title="Biometric unlock"
+            description={
+              !bioSupported
+                ? "Not available on this device or browser."
+                : bioEnrolled
+                  ? "Use Face ID, Touch ID, or Windows Hello to unlock."
+                  : "Skip typing your passphrase on trusted devices."
+            }
+            onClick={
+              bioSupported && !bioBusy ? () => void toggleBiometric(!bioEnrolled) : undefined
+            }
+            disabled={!bioSupported || bioBusy}
+            trailing={
+              <Switch
+                checked={bioEnrolled}
+                disabled={!bioSupported || bioBusy}
+                onCheckedChange={(v) => void toggleBiometric(v)}
+                onClick={(e) => e.stopPropagation()}
+                aria-label="Biometric unlock"
+              />
+            }
+          />
+        </SettingsGroup>
+
+
+
         <SectionLabel>Privacy</SectionLabel>
         <SettingsGroup>
           <SettingsRow
