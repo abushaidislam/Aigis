@@ -108,6 +108,32 @@ function ProfilePage() {
     navigate({ to: "/auth", replace: true });
   };
 
+  const handleDelete = async () => {
+    const email = user.email ?? "your account";
+    const ok = window.confirm(
+      `Permanently delete ${email}?\n\nThis erases every stored code, your passphrase, and your account itself. It cannot be undone.`,
+    );
+    if (!ok) return;
+    const confirmText = window.prompt('Type "delete" to confirm.');
+    if (confirmText?.trim().toLowerCase() !== "delete") return;
+    setDeleting(true);
+    setNotice(null);
+    try {
+      await deleteAccount();
+      await queryClient.cancelQueries();
+      queryClient.clear();
+      lockVault();
+      await supabase.auth.signOut();
+      navigate({ to: "/auth", replace: true });
+    } catch (err) {
+      setNotice({
+        kind: "error",
+        text: err instanceof Error ? err.message : "Could not delete account.",
+      });
+      setDeleting(false);
+    }
+  };
+
   const seed = displayName || user.email || "?";
   const displayShown = initialName || "Unnamed";
 
