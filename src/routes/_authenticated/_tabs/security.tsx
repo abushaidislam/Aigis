@@ -13,7 +13,9 @@ import {
   X,
   FileText,
   EyeOff,
+  Fingerprint,
 } from "lucide-react";
+
 import { Switch } from "@/components/ui/switch";
 import { setHideCodes, useHideCodes } from "@/lib/vault-privacy";
 import {
