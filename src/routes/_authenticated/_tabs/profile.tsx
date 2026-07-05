@@ -22,6 +22,7 @@ import {
   BORDER,
   CHARCOAL,
   CREAM_SOFT,
+  DANGER,
   MUTED,
   Notice,
   soft,
