@@ -276,7 +276,7 @@ function ProfilePage() {
               letterSpacing: "0.02em",
             }}
           >
-            <span className="flex h-full w-full items-center justify-center overflow-hidden rounded-full">
+            <span className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-full">
               {hasAvatar && avatarUrl ? (
                 <img
                   src={avatarUrl}
@@ -287,6 +287,19 @@ function ProfilePage() {
               ) : (
                 initials(seed)
               )}
+              <AnimatePresence>
+                {avatarBusy && (
+                  <motion.span
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="absolute inset-0 flex items-center justify-center rounded-full"
+                    style={{ background: "rgba(20,20,20,0.55)", color: CREAM_SOFT }}
+                  >
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  </motion.span>
+                )}
+              </AnimatePresence>
             </span>
             {/* Tactile "editable" badge — always visible on mobile so the
                 affordance is obvious without hover. */}
