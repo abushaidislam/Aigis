@@ -544,6 +544,7 @@ export function AccountCard({ account, now, isFavorite, onToggleFavorite, onDele
                   Current code
                 </div>
                 <div
+                  id={detailsTitleId}
                   className="truncate text-[17px]"
                   style={{
                     fontFamily: "'Playfair Display', serif",
