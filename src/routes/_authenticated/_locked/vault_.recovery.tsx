@@ -83,9 +83,9 @@ function RecoverySheetPage() {
         const p: BackupPayload = {
           v: 1,
           kdf: meta.kdf_algorithm,
-          salt: toHex(meta.kdf_salt),
-          wk: toHex(meta.recovery_wrapped_key),
-          iv: toHex(meta.recovery_wrapped_key_iv),
+          salt: byteaToHex(meta.kdf_salt),
+          wk: byteaToHex(meta.recovery_wrapped_key),
+          iv: byteaToHex(meta.recovery_wrapped_key_iv),
           issued: new Date().toISOString(),
         };
         setPayload(p);
